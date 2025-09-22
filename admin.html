@@ -292,12 +292,12 @@
     }
 
     function renderBookings() {
-        document.getElementById('bookings').innerHTML = allBookings.map(booking => {
+        document.getElementById('bookings').innerHTML = allBookings.map((booking, index) => {
             const startDate = new Date(booking.start).toLocaleString('ru-RU', { timeZone: 'UTC' });
             const endDate = new Date(booking.end).toLocaleString('ru-RU', { timeZone: 'UTC' });
             
             return `
-                <div class="booking-item" data-booking-id="${booking.id}">
+                <div class="booking-item" onclick="openBookingModal(${index})">
                     <div class="booking-info">
                         <div class="booking-room">${booking.room}</div>
                         <div class="booking-time">${startDate} → ${endDate}</div>
@@ -305,16 +305,12 @@
                 </div>
             `;
         }).join('');
-
-        // Добавляем обработчики событий для каждого элемента брони
-        document.querySelectorAll('.booking-item').forEach(item => {
-            item.addEventListener('click', handleBookingClick);
-        });
     }
 
-    function handleBookingClick(event) {
-        const bookingId = event.currentTarget.getAttribute('data-booking-id');
-        const booking = allBookings.find(b => b.id == bookingId);
+    function openBookingModal(index) {
+        console.log('Клик по элементу с индексом:', index);
+        const booking = allBookings[index];
+        console.log('Найдена бронь:', booking);
         if (booking) {
             showBookingDetails(booking);
         }
