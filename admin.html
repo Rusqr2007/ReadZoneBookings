@@ -90,6 +90,7 @@
         .booking-item:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            background: #f0f0f0;
         }
         
         .booking-item:active {
@@ -250,7 +251,7 @@
         <div class="modal-title">Информация о брони</div>
         
         <div id="modalDetails">
-            </div>
+        </div>
     </div>
 </div>
 
@@ -287,33 +288,43 @@
         }
         
         allBookings = data;
-        
-        document.getElementById('bookings').innerHTML = allBookings.map(b => {
-            const startDate = new Date(b.start).toLocaleString('ru-RU', { timeZone: 'UTC' });
-            const endDate = new Date(b.end).toLocaleString('ru-RU', { timeZone: 'UTC' });
+        renderBookings();
+    }
+
+    function renderBookings() {
+        document.getElementById('bookings').innerHTML = allBookings.map(booking => {
+            const startDate = new Date(booking.start).toLocaleString('ru-RU', { timeZone: 'UTC' });
+            const endDate = new Date(booking.end).toLocaleString('ru-RU', { timeZone: 'UTC' });
             
             return `
-                <div class="booking-item" data-id="${b.id}">
+                <div class="booking-item" data-booking-id="${booking.id}">
                     <div class="booking-info">
-                        <div class="booking-room">${b.room}</div>
+                        <div class="booking-room">${booking.room}</div>
                         <div class="booking-time">${startDate} → ${endDate}</div>
                     </div>
                 </div>
             `;
         }).join('');
 
+        // Добавляем обработчики событий для каждого элемента брони
         document.querySelectorAll('.booking-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const bookingId = e.currentTarget.getAttribute('data-id');
-                const booking = allBookings.find(b => b.id == bookingId);
-                if(booking) {
-                    showBookingDetails(booking);
-                }
-            });
+            item.addEventListener('click', handleBookingClick);
         });
     }
 
+    function handleBookingClick(event) {
+        const bookingId = event.currentTarget.getAttribute('data-booking-id');
+        const booking = allBookings.find(b => b.id == bookingId);
+        if (booking) {
+            showBookingDetails(booking);
+        }
+    }
+
     async function deleteBooking(bookingId) {
+        if (!confirm('Вы уверены, что хотите удалить эту бронь?')) {
+            return;
+        }
+
         const { error } = await supabase
             .from('bookings')
             .delete()
@@ -323,8 +334,10 @@
             alert('Ошибка при удалении брони: ' + error.message);
         } else {
             alert('Бронь успешно удалена!');
-            load();
+            // Закрываем модальное окно
             document.getElementById('bookingModal').style.display = 'none';
+            // Перезагружаем список бронирований
+            load();
         }
     }
 
@@ -332,12 +345,15 @@
         const modal = document.getElementById('bookingModal');
         const modalDetails = document.getElementById('modalDetails');
         
-        const userName = booking.user && booking.user.raw_user_meta_data && booking.user.raw_user_meta_data.full_name ? booking.user.raw_user_meta_data.full_name : booking.user_email || 'Неизвестно';
+        const userName = booking.user && booking.user.raw_user_meta_data && booking.user.raw_user_meta_data.full_name 
+            ? booking.user.raw_user_meta_data.full_name 
+            : booking.user_email || 'Неизвестно';
         const userEmail = booking.user_email;
         
+        // Показываем кнопку удаления только если бронь принадлежит текущему пользователю
         let deleteButtonHTML = '';
         if (currentUser && booking.user_id === currentUser.id) {
-            deleteButtonHTML = `<button class="modal-delete-btn" onclick="deleteBooking(${booking.id})">Удалить</button>`;
+            deleteButtonHTML = `<button class="modal-delete-btn" onclick="deleteBooking('${booking.id}')">Удалить бронь</button>`;
         }
         
         modalDetails.innerHTML = `
@@ -367,19 +383,26 @@
         modal.style.display = 'flex';
     }
 
+    // Инициализация после загрузки DOM
     document.addEventListener('DOMContentLoaded', load);
     
-    // Закрытие модального окна
-    document.querySelector('.close-btn').addEventListener('click', () => {
-        document.getElementById('bookingModal').style.display = 'none';
-    });
-    
-    window.addEventListener('click', (e) => {
-        if (e.target == document.getElementById('bookingModal')) {
-            document.getElementById('bookingModal').style.display = 'none';
+    // Закрытие модального окна при клике на крестик
+    document.addEventListener('DOMContentLoaded', () => {
+        const closeBtn = document.querySelector('.close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                document.getElementById('bookingModal').style.display = 'none';
+            });
         }
     });
-
+    
+    // Закрытие модального окна при клике вне его
+    window.addEventListener('click', (event) => {
+        const modal = document.getElementById('bookingModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
 </script>
 </body>
 </html>
