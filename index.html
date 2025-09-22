@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-s<p></p>cale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ReadZone - Бронирование читального зала</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
@@ -31,6 +31,7 @@
             width: 100%;
             max-width: 450px;
             text-align: center;
+            position: relative;
         }
 
         h1 {
@@ -127,6 +128,11 @@
             border-radius: 10px;
             margin-bottom: 10px;
             border-left: 4px solid #667eea;
+            cursor: pointer;
+        }
+        
+        .booking-item:hover {
+            background: #e9ecef;
         }
 
         .booking-time {
@@ -177,6 +183,61 @@
             margin-bottom: 20px;
             text-align: left;
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: left;
+            position: relative;
+        }
+        
+        .modal-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .modal-close:hover {
+            color: black;
+        }
+
+        .ticket-info h3 {
+            margin-bottom: 10px;
+            color: #444;
+        }
+
+        .ticket-info p {
+            margin-bottom: 8px;
+        }
+        
+        .ticket-info strong {
+            color: #222;
+        }
+        
+        .admin-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -185,6 +246,10 @@
         <p class="subtitle">Бронирование читального зала</p>
 
         <div class="auth-card active" id="authCard">
+            <div class="form-group">
+                <label for="name">Имя (необязательно)</label>
+                <input type="text" id="name" placeholder="Ваше имя">
+            </div>
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" placeholder="your@email.com" required>
@@ -226,6 +291,10 @@
 
             <button class="btn" onclick="createBooking()">Забронировать</button>
             <button class="btn btn-secondary" onclick="signOut()">Выйти</button>
+            
+            <div class="admin-link" id="adminLink" style="display: none;">
+                <a href="/admin.html">Перейти в админ-панель</a>
+            </div>
 
             <div id="bookingMessage"></div>
 
@@ -233,6 +302,13 @@
                 <h3>Мои брони</h3>
                 <div id="bookingsList"></div>
             </div>
+        </div>
+    </div>
+    
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="ticketContent" class="ticket-info"></div>
         </div>
     </div>
 
@@ -256,6 +332,7 @@
         });
 
         async function signUp() {
+            const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             
@@ -271,7 +348,12 @@
             
             const { data, error } = await supabase.auth.signUp({
                 email: email,
-                password: password
+                password: password,
+                options: {
+                    data: {
+                        name: name
+                    }
+                }
             });
             
             if (error) {
@@ -328,9 +410,8 @@
                 return;
             }
 
-            // Проверка, что бронь не превышает 4 часа
             const durationHours = (endTime - startTime) / (1000 * 60 * 60);
-            if (durationHours > 4.01) { // 4.01 для небольшого запаса
+            if (durationHours > 4.01) { 
                 showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
                 return;
             }
@@ -340,6 +421,7 @@
                 .insert([{
                     user_id: currentUser.id,
                     user_email: currentUser.email,
+                    user_name: currentUser.user_metadata.name || currentUser.email,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
                     end: endTime.toISOString()
@@ -367,28 +449,60 @@
                 return;
             }
             
-            bookingsList.innerHTML = bookings.map(booking => {
+            bookingsList.innerHTML = bookings.map((booking, index) => {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
                 const duration = Math.round((endTime - startTime) / (1000 * 60 * 60));
                 
                 return `
-                    <div class="booking-item">
+                    <div class="booking-item" onclick="showTicket(${index})">
                         <div class="booking-time">${startTime.toLocaleDateString('ru-RU')} в ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
                         <div class="booking-duration">Длительность: ${duration} час(а)</div>
                     </div>
                 `;
             }).join('');
+            
+            window.bookingsData = bookings;
+        }
+        
+        function showTicket(index) {
+            const booking = window.bookingsData[index];
+            const startTime = new Date(booking.start);
+            const endTime = new Date(booking.end);
+            
+            const ticketContent = `
+                <h3>Ваша бронь</h3>
+                <p><strong>Комната:</strong> ${booking.room}</p>
+                <p><strong>Дата:</strong> ${startTime.toLocaleDateString('ru-RU')}</p>
+                <p><strong>Время:</strong> ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} - ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</p>
+                <p><strong>Забронировано на имя:</strong> ${booking.user_name || booking.user_email}</p>
+            `;
+            
+            document.getElementById('ticketContent').innerHTML = ticketContent;
+            document.getElementById('bookingModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('bookingModal').style.display = 'none';
         }
 
         function showAuthForm() {
             document.getElementById('authCard').classList.add('active');
             document.getElementById('bookingCard').classList.remove('active');
+            document.getElementById('adminLink').style.display = 'none';
         }
 
         function showBookingForm() {
             document.getElementById('authCard').classList.remove('active');
             document.getElementById('bookingCard').classList.add('active');
+            
+            // Замените 'admin@example.com' на email вашего аккаунта администратора
+            if (currentUser && currentUser.email === 'admin@example.com') {
+                document.getElementById('adminLink').style.display = 'block';
+            } else {
+                document.getElementById('adminLink').style.display = 'none';
+            }
+            
             loadUserBookings();
         }
 
