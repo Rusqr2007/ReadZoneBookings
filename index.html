@@ -1,258 +1,117 @@
-<!-- index.html -->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Читальная зона — бронирование</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{--bg:#f6f8fb;--card:#fff;--accent:#0b7285;--muted:#6b7280}
-  *{box-sizing:border-box}
-  body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;background:linear-gradient(180deg,#eef3f7, var(--bg));min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:40px}
-  .wrap{max-width:980px;width:100%;display:grid;grid-template-columns:1fr 420px;gap:28px;align-items:start}
-  .hero{background:var(--card);padding:28px;border-radius:14px;box-shadow:0 14px 40px rgba(11,18,30,.06)}
-  h1{margin:0 0 6px 0;font-size:24px}
-  p.lead{margin:0;color:var(--muted)}
-  .rooms{display:flex;gap:12px;margin-top:18px}
-  .room{padding:12px 14px;border-radius:10px;border:1px solid #e6eef2;cursor:pointer;font-weight:600}
-  .room.active{background:linear-gradient(90deg,#e6fbff,#e6f7ff);border-color:var(--accent);color:var(--accent)}
-  .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 10px 30px rgba(11,18,30,.04)}
-  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef2}
-  button.primary{background:var(--accent);color:#fff;border:0;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;width:100%}
-  .muted{color:var(--muted);font-size:13px;margin-top:8px}
-  .small{font-size:13px;color:#111;margin-top:8px}
-  .center{display:flex;gap:8px;align-items:center}
-  .bookings-list{margin-top:14px;max-height:240px;overflow:auto;border-top:1px solid #f1f5f9;padding-top:12px}
-  .booking-item{padding:8px;border-radius:8px;border:1px solid #f1f5f9;margin-bottom:8px;background:#fbfeff}
-  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-  a.link{color:var(--accent);text-decoration:none;font-weight:600}
-  @media (max-width:880px){.wrap{grid-template-columns:1fr; padding:12px} .card{margin-top:12px}}
-</style>
+  <meta charset="UTF-8">
+  <title>ReadZoneBookings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Подключаем Tailwind для красивого интерфейса -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
-<body>
-<div class="wrap">
-  <div class="hero">
-    <div class="topbar">
-      <div>
-        <h1>Бронирование читальной зоны</h1>
-        <p class="lead">Выберите комнату, дату и время — максимум 4 часа в день. Красиво и просто.</p>
-      </div>
-      <div class="center">
-        <a class="link" href="/profile.html">Профиль</a>
-        <span style="width:12px"></span>
-        <a class="link" href="/admin.html">Админ</a>
-      </div>
+<body class="bg-gradient-to-br from-indigo-100 to-white min-h-screen flex items-center justify-center">
+
+  <div class="w-full max-w-md bg-white shadow-xl rounded-2xl p-6">
+    <h1 class="text-2xl font-bold text-center text-indigo-600 mb-6">ReadZoneBookings</h1>
+
+    <!-- Форма авторизации -->
+    <div id="auth-section">
+      <input id="email" type="email" placeholder="Email" class="w-full mb-3 p-2 border rounded-md">
+      <input id="password" type="password" placeholder="Пароль" class="w-full mb-3 p-2 border rounded-md">
+      <button onclick="signIn()" class="w-full bg-indigo-600 text-white py-2 rounded-md mb-2 hover:bg-indigo-700">Войти</button>
+      <button onclick="signUp()" class="w-full bg-gray-200 py-2 rounded-md hover:bg-gray-300">Регистрация</button>
     </div>
 
-    <div>
-      <div class="rooms" id="rooms">
-        <!-- комнаты будут рендериться JS -->
-      </div>
+    <!-- Секция бронирований -->
+    <div id="booking-section" class="hidden">
+      <p class="text-gray-600 mb-3">Привет, <span id="user-email"></span> 👋</p>
 
-      <div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label for="date">Дата</label>
-          <input id="date" type="date"/>
-        </div>
-        <div>
-          <label for="start">Время начала</label>
-          <input id="start" type="time"/>
-        </div>
-      </div>
+      <label class="block mb-1 text-sm font-medium">Комната</label>
+      <select id="room" class="w-full mb-3 p-2 border rounded-md">
+        <option value="Room A">Комната A</option>
+        <option value="Room B">Комната B</option>
+      </select>
 
-      <div style="margin-top:12px;display:flex;gap:12px">
-        <div style="flex:1">
-          <label for="hours">Длительность (часы, до 4)</label>
-          <select id="hours">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4" selected>4</option>
-          </select>
-        </div>
-        <div style="width:140px">
-          <label>&nbsp;</label>
-          <button class="primary" id="bookBtn">Забронировать</button>
-        </div>
-      </div>
+      <label class="block mb-1 text-sm font-medium">Дата</label>
+      <input id="date" type="date" class="w-full mb-3 p-2 border rounded-md">
 
-      <div class="muted">Правило: максимум 4 часа в сутки на одну комнату. Система автоматически проверяет пересечения.</div>
+      <label class="block mb-1 text-sm font-medium">Время (макс. 4 часа)</label>
+      <input id="time-start" type="time" class="w-full mb-3 p-2 border rounded-md">
+      <input id="time-end" type="time" class="w-full mb-3 p-2 border rounded-md">
 
-      <div class="bookings-list" id="bookingsList"></div>
+      <button onclick="bookRoom()" class="w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700">Забронировать</button>
+      <button onclick="signOut()" class="w-full mt-3 bg-red-500 text-white py-2 rounded-md hover:bg-red-600">Выйти</button>
+
+      <h2 class="text-lg font-semibold mt-6 mb-2">📅 Ваши бронирования:</h2>
+      <ul id="bookings-list" class="space-y-2 text-sm text-gray-700"></ul>
     </div>
   </div>
 
-  <div class="card">
-    <h3 style="margin:0 0 8px 0">Состояние</h3>
-    <div id="statusBlock">
-      <div class="small">Вы не авторизованы. <a href="#" id="showAuth">Войти / Регистрация</a></div>
-    </div>
+  <script>
+    // === ВСТАВЬ СВОИ ЗНАЧЕНИЯ ===
+    const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
+    const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    <div id="authBlock" style="margin-top:12px;display:none">
-      <label>Email</label>
-      <input id="email" type="email" placeholder="you@example.com">
-      <label style="margin-top:8px">Пароль</label>
-      <input id="password" type="password" placeholder="пароль">
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="signup" style="flex:1">Зарегистрироваться</button>
-        <button id="login" style="flex:1;background:#e6f7fa;border:1px solid #b6e4ea">Войти</button>
-      </div>
-    </div>
+    // Авторизация
+    async function signUp() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      let { error } = await supabase.auth.signUp({ email, password });
+      if (error) alert(error.message); else alert("Регистрация прошла успешно!");
+    }
 
-    <div style="margin-top:14px">
-      <div class="muted">Список комнат (пример):</div>
-      <ul id="roomLegend">
-        <!-- легенда -->
-      </ul>
-    </div>
+    async function signIn() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert(error.message); else {
+        document.getElementById("auth-section").classList.add("hidden");
+        document.getElementById("booking-section").classList.remove("hidden");
+        document.getElementById("user-email").textContent = data.user.email;
+        loadBookings();
+      }
+    }
 
-  </div>
-</div>
+    async function signOut() {
+      await supabase.auth.signOut();
+      document.getElementById("auth-section").classList.remove("hidden");
+      document.getElementById("booking-section").classList.add("hidden");
+    }
 
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>
-/*
-  Настройки:
-   - Задай SUPABASE_URL и SUPABASE_ANON_KEY (включи Email/Password в Supabase Auth).
-   - Netlify Function create-booking доступна по / .netlify/functions/create-booking
-*/
-const SUPABASE_URL = "https://YOUR_SUPABASE_URL.supabase.co"; // <- замени
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"; // <- замени
+    // Бронирование
+    async function bookRoom() {
+      const user = (await supabase.auth.getUser()).data.user;
+      const room = document.getElementById("room").value;
+      const date = document.getElementById("date").value;
+      const start = document.getElementById("time-start").value;
+      const end = document.getElementById("time-end").value;
 
-const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Пример комнат — редактируй
-const ROOMS = [
-  { id: 'r1', name: 'Комната 1 — тишина', cap: 6 },
-  { id: 'r2', name: 'Комната 2 — с видом', cap: 4 },
-  { id: 'r3', name: 'Комната 3 — тихий угол', cap: 2 }
-];
-
-const roomsEl = document.getElementById('rooms');
-const roomLegend = document.getElementById('roomLegend');
-const bookingsList = document.getElementById('bookingsList');
-let selectedRoom = ROOMS[0].id;
-
-function renderRooms(){
-  roomsEl.innerHTML = '';
-  roomLegend.innerHTML = '';
-  ROOMS.forEach(r=>{
-    const btn = document.createElement('div');
-    btn.className = 'room' + (r.id===selectedRoom? ' active':'');
-    btn.textContent = r.name;
-    btn.onclick = ()=>{ selectedRoom = r.id; renderRooms(); loadBookingsForRoom(); };
-    roomsEl.appendChild(btn);
-
-    const li = document.createElement('li');
-    li.textContent = `${r.name} — вместимость ${r.cap}`;
-    roomLegend.appendChild(li);
-  });
-}
-renderRooms();
-
-// UI элементы
-const dateEl = document.getElementById('date');
-const startEl = document.getElementById('start');
-const hoursEl = document.getElementById('hours');
-const bookBtn = document.getElementById('bookBtn');
-const statusBlock = document.getElementById('statusBlock');
-const authBlock = document.getElementById('authBlock');
-const showAuth = document.getElementById('showAuth');
-
-document.getElementById('signup').onclick = async ()=>{
-  const email = document.getElementById('email').value;
-  const pass = document.getElementById('password').value;
-  if(!email || !pass){ alert('введите email и пароль'); return; }
-  const { error } = await supabase.auth.signUp({ email, password: pass });
-  if(error) alert('Ошибка: ' + error.message); else alert('Регистрация: проверь почту если включено подтверждение.');
-};
-
-document.getElementById('login').onclick = async ()=>{
-  const email = document.getElementById('email').value;
-  const pass = document.getElementById('password').value;
-  if(!email || !pass){ alert('введите email и пароль'); return; }
-  const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-  if(error) alert('Ошибка: ' + error.message); else { updateAuthState(); loadBookingsForRoom(); }
-};
-
-showAuth.onclick = (e)=>{ e.preventDefault(); authBlock.style.display = authBlock.style.display==='none' ? 'block' : 'none'; };
-
-async function updateAuthState(){
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user){
-    statusBlock.innerHTML = `<div class="small">Вы не авторизованы. <a href="#" id="showAuth2">Войти / Регистрация</a></div>`;
-    document.getElementById('showAuth2')?.addEventListener('click', e=>{ e.preventDefault(); authBlock.style.display='block'; });
-  } else {
-    statusBlock.innerHTML = `<div><b>${user.email}</b><div class="muted">id: ${user.id}</div><div style="margin-top:8px"><button id="logoutBtn">Выйти</button></div></div>`;
-    document.getElementById('logoutBtn').onclick = async ()=>{ await supabase.auth.signOut(); location.reload(); };
-  }
-}
-updateAuthState();
-
-// Загрузка бронирований (публично доступно — показывает ближайшие)
-async function loadBookingsForRoom(){
-  bookingsList.innerHTML = 'Загрузка...';
-  try{
-    const res = await fetch('/.netlify/functions/list-bookings?room=' + encodeURIComponent(selectedRoom));
-    if(!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    if(!Array.isArray(data) || data.length===0) { bookingsList.innerHTML = '<div class="muted">Бронирований нет</div>'; return; }
-    bookingsList.innerHTML = data.map(b=>{
-      const s = new Date(b.start).toLocaleString();
-      const e = new Date(b.end).toLocaleString();
-      return `<div class="booking-item"><b>${b.user_email||'Пользователь'}</b><div class="muted">${s} — ${e}</div></div>`;
-    }).join('');
-  }catch(err){
-    bookingsList.innerHTML = '<div class="muted">Ошибка загрузки</div>';
-    console.error(err);
-  }
-}
-loadBookingsForRoom();
-
-// Кнопка брони — вызывает serverless функцию (create-booking)
-bookBtn.onclick = async ()=>{
-  const { data: { user } } = await supabase.auth.getUser();
-  if(!user){ alert('Войдите или зарегистрируйтесь'); return; }
-  const d = dateEl.value;
-  const t = startEl.value;
-  const h = parseInt(hoursEl.value,10);
-  if(!d||!t){ alert('Выберите дату и время начала'); return; }
-  // формируем ISO время (локальное) — отправляем на сервер как ISO (запрашиваем сервер в UTC)
-  const startISO = new Date(d + 'T' + t + ':00').toISOString();
-  const endDt = new Date(new Date(startISO).getTime() + h*60*60*1000);
-  const endISO = endDt.toISOString();
-
-  bookBtn.disabled = true;
-  bookBtn.textContent = 'Сохраняю...';
-
-  try{
-    const res = await fetch('/.netlify/functions/create-booking', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({
-        room: selectedRoom,
-        start: startISO,
-        end: endISO,
+      if (!date || !start || !end) return alert("Заполни все поля!");
+      let { error } = await supabase.from("bookings").insert({
         user_id: user.id,
-        user_email: user.email
-      })
-    });
-    const json = await res.json();
-    if(!res.ok) throw new Error(json.error || JSON.stringify(json));
-    alert('Бронирование создано!');
-    loadBookingsForRoom();
-  }catch(err){
-    alert('Не получилось: ' + err.message);
-    console.error(err);
-  } finally {
-    bookBtn.disabled = false;
-    bookBtn.textContent = 'Забронировать';
-  }
-};
-</script>
+        user_email: user.email,
+        room: room,
+        start: new Date(`${date}T${start}`),
+        end: new Date(`${date}T${end}`)
+      });
+      if (error) alert(error.message); else loadBookings();
+    }
+
+    async function loadBookings() {
+      const user = (await supabase.auth.getUser()).data.user;
+      let { data, error } = await supabase.from("bookings")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("start", { ascending: true });
+      if (error) return console.log(error);
+
+      let list = document.getElementById("bookings-list");
+      list.innerHTML = "";
+      data.forEach(b => {
+        list.innerHTML += `<li>📖 ${b.room} — ${new Date(b.start).toLocaleString()} → ${new Date(b.end).toLocaleString()}</li>`;
+      });
+    }
+  </script>
 </body>
 </html>
