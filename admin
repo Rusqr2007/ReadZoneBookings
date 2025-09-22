@@ -1,0 +1,23 @@
+<!-- admin.html -->
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin — брони</title>
+<style>body{font-family:system-ui;padding:22px;background:#f6f8fb} .card{background:#fff;padding:18px;border-radius:12px;max-width:920px;box-shadow:0 10px 30px rgba(0,0,0,.05)} pre{white-space:pre-wrap}</style>
+</head>
+<body>
+<div class="card">
+  <h2>Админ — Все брони</h2>
+  <div id="out">Загрузка...</div>
+</div>
+
+<script>
+async function loadAll(){
+  const res = await fetch('/.netlify/functions/list-bookings');
+  if(!res.ok){ document.getElementById('out').innerText = 'Ошибка: ' + res.status; return; }
+  const arr = await res.json();
+  document.getElementById('out').innerHTML = arr.map(b=>`<div style="padding:8px;border-bottom:1px solid #f1f5f9"><b>${b.room}</b> — ${b.user_email||b.user_id}<div class="muted">${new Date(b.start).toLocaleString()} → ${new Date(b.end).toLocaleString()}</div></div>`).join('');
+}
+loadAll();
+</script>
+</body>
+</html>
