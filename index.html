@@ -128,7 +128,7 @@
             border-radius: 10px;
             margin-bottom: 10px;
             border-left: 4px solid #667eea;
-            cursor: pointer; /* Добавлено для кликабельности */
+            cursor: pointer;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         
@@ -488,7 +488,6 @@
             }
         }
         
-        // New functions for loading and handling bookings
         async function loadUserBookings() {
             const { data: bookings, error } = await supabase
                 .from('bookings')
@@ -548,7 +547,6 @@
             addClickListeners(bookings);
         }
         
-        // This is the new crucial function
         function addClickListeners(bookings) {
             document.querySelectorAll('.booking-item').forEach(item => {
                 item.addEventListener('click', (e) => {
@@ -585,18 +583,33 @@
         }
 
         async function deleteBooking(bookingId) {
-            const { error } = await supabase
-                .from('bookings')
-                .delete()
-                .eq('id', bookingId);
-            
-            if (error) {
-                alert('Ошибка при удалении брони: ' + error.message);
-            } else {
-                alert('Бронь успешно удалена!');
-                document.getElementById('bookingModal').style.display = 'none';
-                loadUserBookings();
-                loadAllBookings();
+            if (!currentUser) {
+                alert('Вы не авторизованы для удаления бронирования.');
+                return;
+            }
+
+            if (confirm('Вы уверены, что хотите удалить эту бронь?')) {
+                const response = await fetch('/.netlify/functions/delete-booking', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        booking_id: bookingId,
+                        user_id: currentUser.id,
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(result.message);
+                    document.getElementById('bookingModal').style.display = 'none';
+                    loadUserBookings();
+                    loadAllBookings();
+                } else {
+                    alert('Ошибка при удалении брони: ' + result.error);
+                }
             }
         }
         
