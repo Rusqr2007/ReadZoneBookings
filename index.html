@@ -108,11 +108,11 @@
             margin-top: 10px;
         }
 
-        .auth-card, .booking-card {
+        .auth-card, .booking-card, .password-reset-card {
             display: none;
         }
 
-        .auth-card.active, .booking-card.active {
+        .auth-card.active, .booking-card.active, .password-reset-card.active {
             display: block;
         }
 
@@ -186,6 +186,10 @@
 
         <div class="auth-card active" id="authCard">
             <div class="form-group">
+                <label for="name">Ваше имя</label>
+                <input type="text" id="name" placeholder="Name" required>
+            </div>
+            <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" placeholder="your@email.com" required>
             </div>
@@ -197,8 +201,20 @@
             
             <button class="btn" onclick="signIn()">Войти</button>
             <button class="btn btn-secondary" onclick="signUp()">Зарегистрироваться</button>
+            <button class="btn btn-secondary" onclick="showPasswordReset()">Сброс пароля</button>
             
             <div id="authMessage"></div>
+        </div>
+
+        <div class="password-reset-card" id="passwordResetCard">
+            <h2>Сброс пароля</h2>
+            <div class="form-group">
+                <label for="resetEmail">Email</label>
+                <input type="email" id="resetEmail" placeholder="your@email.com" required>
+            </div>
+            <button class="btn" onclick="requestPasswordReset()">Отправить письмо</button>
+            <button class="btn btn-secondary" onclick="showAuthForm()">Вернуться ко входу</button>
+            <div id="resetMessage"></div>
         </div>
 
         <div class="booking-card" id="bookingCard">
@@ -261,10 +277,11 @@
         });
 
         async function signUp() {
+            const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             
-            if (!email || !password) {
+            if (!name || !email || !password) {
                 showMessage('authMessage', 'Заполните все поля', 'error');
                 return;
             }
@@ -276,7 +293,12 @@
             
             const { data, error } = await supabase.auth.signUp({
                 email: email,
-                password: password
+                password: password,
+                options: {
+                    data: {
+                        full_name: name
+                    }
+                }
             });
             
             if (error) {
@@ -309,6 +331,22 @@
             }
         }
 
+        async function requestPasswordReset() {
+            const email = document.getElementById('resetEmail').value.trim();
+            if (!email) {
+                showMessage('resetMessage', 'Введите ваш email', 'error');
+                return;
+            }
+
+            const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+            if (error) {
+                showMessage('resetMessage', 'Ошибка: ' + error.message, 'error');
+            } else {
+                showMessage('resetMessage', 'Инструкции по сбросу пароля отправлены на ваш email.', 'success');
+            }
+        }
+
         async function signOut() {
             await supabase.auth.signOut();
             currentUser = null;
@@ -333,9 +371,8 @@
                 return;
             }
 
-            // Проверка, что бронь не превышает 4 часа
             const durationHours = (endTime - startTime) / (1000 * 60 * 60);
-            if (durationHours > 4.01) { // 4.01 для небольшого запаса
+            if (durationHours > 4.01) {
                 showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
                 return;
             }
@@ -355,7 +392,7 @@
             } else {
                 showMessage('bookingMessage', 'Бронь создана успешно!', 'success');
                 loadUserBookings();
-                loadAllBookings(); // Обновляем список всех броней
+                loadAllBookings();
             }
         }
 
@@ -417,11 +454,19 @@
         function showAuthForm() {
             document.getElementById('authCard').classList.add('active');
             document.getElementById('bookingCard').classList.remove('active');
+            document.getElementById('passwordResetCard').classList.remove('active');
+        }
+
+        function showPasswordReset() {
+            document.getElementById('authCard').classList.remove('active');
+            document.getElementById('bookingCard').classList.remove('active');
+            document.getElementById('passwordResetCard').classList.add('active');
         }
 
         function showBookingForm() {
             document.getElementById('authCard').classList.remove('active');
             document.getElementById('bookingCard').classList.add('active');
+            document.getElementById('passwordResetCard').classList.remove('active');
             loadUserBookings();
             loadAllBookings();
         }
