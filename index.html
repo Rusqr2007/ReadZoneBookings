@@ -521,7 +521,7 @@
         async function loadAllBookings() {
             const { data: bookings, error } = await supabase
                 .from('bookings')
-                .select('*, user:user_id(raw_user_meta_data)')
+                .select('*')
                 .order('start', { ascending: true });
             
             const allBookingsList = document.getElementById('allBookingsList');
@@ -534,7 +534,7 @@
             allBookingsList.innerHTML = bookings.map(booking => {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
-                const userName = booking.user && booking.user.raw_user_meta_data && booking.user.raw_user_meta_data.full_name ? booking.user.raw_user_meta_data.full_name : booking.user_email || 'Неизвестно';
+                const userName = booking.user_email || 'Неизвестно';
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
@@ -563,11 +563,11 @@
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            const userName = booking.user && booking.user.raw_user_meta_data && booking.user.raw_user_meta_data.full_name ? booking.user.raw_user_meta_data.full_name : booking.user_email || 'Неизвестно';
+            const userName = booking.user_email || 'Неизвестно';
 
             let deleteButtonHTML = '';
             if (currentUser && booking.user_id === currentUser.id) {
-                deleteButtonHTML = `<button class="modal-delete-btn" onclick="deleteBooking(${booking.id})">Удалить</button>`;
+                deleteButtonHTML = `<button class="modal-delete-btn" onclick="confirmDelete('${booking.id}')">Удалить</button>`;
             }
 
             modalInfo.innerHTML = `
@@ -582,34 +582,36 @@
             modal.style.display = 'flex';
         }
 
+        function confirmDelete(bookingId) {
+            if (confirm('Вы уверены, что хотите удалить эту бронь?')) {
+                deleteBooking(bookingId);
+            }
+        }
+
         async function deleteBooking(bookingId) {
             if (!currentUser) {
                 alert('Вы не авторизованы для удаления бронирования.');
                 return;
             }
 
-            if (confirm('Вы уверены, что хотите удалить эту бронь?')) {
-                const response = await fetch('/.netlify/functions/delete-booking', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        booking_id: bookingId,
-                        user_id: currentUser.id,
-                    }),
-                });
+            console.log('Попытка удалить бронь с ID:', bookingId);
 
-                const result = await response.json();
+            // Прямое обращение к Supabase с проверкой владельца
+            const { error } = await supabase
+                .from('bookings')
+                .delete()
+                .eq('id', bookingId)
+                .eq('user_id', currentUser.id); // Дополнительная проверка безопасности
 
-                if (response.ok) {
-                    alert(result.message);
-                    document.getElementById('bookingModal').style.display = 'none';
-                    loadUserBookings();
-                    loadAllBookings();
-                } else {
-                    alert('Ошибка при удалении брони: ' + result.error);
-                }
+            if (error) {
+                console.error('Ошибка удаления:', error);
+                alert('Ошибка при удалении брони: ' + error.message);
+            } else {
+                console.log('Бронь успешно удалена');
+                alert('Бронь успешно удалена!');
+                document.getElementById('bookingModal').style.display = 'none';
+                loadUserBookings();
+                loadAllBookings();
             }
         }
         
