@@ -72,7 +72,6 @@
         #bookings {
             text-align: left;
         }
-
         .booking-item {
             background: #f9f9f9;
             padding: 18px;
@@ -80,6 +79,9 @@
             margin-bottom: 12px;
             border-left: 5px solid var(--secondary-color);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .booking-item:hover {
@@ -89,9 +91,12 @@
 
         .booking-info {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .booking-actions {
+            display: flex;
             align-items: center;
-            margin-bottom: 5px;
         }
 
         .booking-room {
@@ -111,6 +116,23 @@
             font-size: 0.9rem;
             text-align: center;
             margin-top: 10px;
+        }
+        
+        .delete-btn {
+            background: none;
+            border: 1px solid #ff4d4f;
+            color: #ff4d4f;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .delete-btn:hover {
+            background-color: #ff4d4f;
+            color: white;
         }
 
         .back-link {
@@ -150,7 +172,7 @@
             location.href = '/';
             return;
         }
-        document.getElementById('info').innerHTML = `<b>${user.email}</b> (id: ${user.id}) <button id=\"logout\">Выйти</button>`;
+        document.getElementById('info').innerHTML = `<b>${user.email}</b> (id: ${user.id}) <button id="logout">Выйти</button>`;
         document.getElementById('logout').onclick = async () => {
             await supabase.auth.signOut();
             location.href = '/';
@@ -174,9 +196,35 @@
                         <div class="booking-room">${b.room}</div>
                         <div class="booking-time">${startDate} → ${endDate}</div>
                     </div>
+                    <div class="booking-actions">
+                        <button class="delete-btn" data-id="${b.id}">Удалить</button>
+                    </div>
                 </div>
             `;
         }).join('');
+
+        document.querySelectorAll('.delete-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const bookingId = e.target.getAttribute('data-id');
+                if (confirm('Вы уверены, что хотите отменить эту бронь?')) {
+                    await deleteBooking(bookingId);
+                }
+            });
+        });
+    }
+    
+    async function deleteBooking(bookingId) {
+        const { error } = await supabase
+            .from('bookings')
+            .delete()
+            .eq('id', bookingId);
+            
+        if (error) {
+            alert('Ошибка при удалении брони: ' + error.message);
+        } else {
+            alert('Бронь успешно удалена!');
+            load(); // Обновляем список броней
+        }
     }
 
     document.addEventListener('DOMContentLoaded', load);
