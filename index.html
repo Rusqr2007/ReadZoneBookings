@@ -6,7 +6,6 @@
     <title>ReadZone - Бронирование читального зала</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        /* General styles */
         * {
             margin: 0;
             padding: 0;
@@ -38,6 +37,13 @@
             color: #333;
             margin-bottom: 10px;
             font-size: 2rem;
+            font-weight: 600;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
             font-weight: 600;
         }
 
@@ -75,6 +81,11 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
+
+        input:disabled {
+            background-color: #f5f5f5;
+            color: #999;
+        }
         
         .date-time-group {
             display: grid;
@@ -109,11 +120,11 @@
             margin-top: 10px;
         }
 
-        .auth-card, .booking-card, .password-reset-card {
+        .auth-card, .booking-card, .password-reset-card, .settings-card {
             display: none;
         }
 
-        .auth-card.active, .booking-card.active, .password-reset-card.active {
+        .auth-card.active, .booking-card.active, .password-reset-card.active, .settings-card.active {
             display: block;
         }
 
@@ -143,11 +154,6 @@
         }
 
         .booking-duration {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .booking-user {
             color: #666;
             font-size: 0.9rem;
         }
@@ -190,6 +196,11 @@
             margin-bottom: 20px;
             text-align: left;
         }
+
+        small {
+            color: #666;
+            font-size: 0.8rem;
+        }
         
         /* Modal styles */
         .modal {
@@ -229,10 +240,6 @@
         
         .close-btn:hover {
             color: #333;
-        }
-
-        .modal-info {
-            margin-bottom: 15px;
         }
 
         .modal-title {
@@ -277,16 +284,13 @@
                 <label for="email">Email</label>
                 <input type="email" id="email" placeholder="your@email.com" required>
             </div>
-            
             <div class="form-group">
                 <label for="password">Пароль</label>
                 <input type="password" id="password" placeholder="Минимум 6 символов" required>
             </div>
-            
             <button class="btn" onclick="signIn()">Войти</button>
             <button class="btn btn-secondary" onclick="signUp()">Зарегистрироваться</button>
             <button class="btn btn-secondary" onclick="showPasswordReset()">Сброс пароля</button>
-            
             <div id="authMessage"></div>
         </div>
 
@@ -299,6 +303,30 @@
             <button class="btn" onclick="requestPasswordReset()">Отправить письмо</button>
             <button class="btn btn-secondary" onclick="showAuthForm()">Вернуться ко входу</button>
             <div id="resetMessage"></div>
+        </div>
+
+        <div class="settings-card" id="settingsCard">
+            <h2>Настройки аккаунта</h2>
+            <div class="form-group">
+                <label for="settingsName">Имя</label>
+                <input type="text" id="settingsName" placeholder="Ваше имя" required>
+            </div>
+            <div class="form-group">
+                <label for="settingsEmail">Email</label>
+                <input type="email" id="settingsEmail" placeholder="your@email.com" disabled>
+                <small>Email нельзя изменить</small>
+            </div>
+            <div class="form-group">
+                <label for="newPassword">Новый пароль (оставьте пустым, если не хотите менять)</label>
+                <input type="password" id="newPassword" placeholder="Минимум 6 символов">
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Подтвердите новый пароль</label>
+                <input type="password" id="confirmPassword" placeholder="Повторите новый пароль">
+            </div>
+            <button class="btn" onclick="updateProfile()">Сохранить изменения</button>
+            <button class="btn btn-secondary" onclick="showBookingForm()">Вернуться к бронированию</button>
+            <div id="settingsMessage"></div>
         </div>
 
         <div class="booking-card" id="bookingCard">
@@ -326,7 +354,7 @@
 
             <button class="btn" onclick="createBooking()">Забронировать</button>
             <button class="btn btn-secondary" onclick="signOut()">Выйти</button>
-            <button class="btn btn-secondary" onclick="window.location.href='/admin.html'">Профиль</button>
+            <button class="btn btn-secondary" onclick="showSettings()">Настройки</button>
 
             <div id="bookingMessage"></div>
 
@@ -469,11 +497,15 @@
                 return;
             }
 
+            // Получаем имя пользователя
+            const userName = currentUser.user_metadata?.full_name || currentUser.email;
+
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
                     user_email: currentUser.email,
+                    user_name: userName,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
                     end: endTime.toISOString()
@@ -534,11 +566,18 @@
             allBookingsList.innerHTML = bookings.map(booking => {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
-                const userName = booking.user_email || 'Неизвестно';
+                
+                // Определяем отображаемое имя пользователя
+                let displayName = '';
+                if (booking.user_name && booking.user_name.trim()) {
+                    displayName = `${booking.user_name} (${booking.user_email || 'email не указан'})`;
+                } else {
+                    displayName = booking.user_email || 'Неизвестно';
+                }
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${userName} — ${booking.room}</div>
+                        <div class="booking-time">${displayName} — ${booking.room}</div>
                         <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
                     </div>
                 `;
@@ -563,7 +602,15 @@
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            const userName = booking.user_email || 'Неизвестно';
+            // Определяем отображаемое имя пользователя
+            let displayName = '';
+            if (booking.user_name && booking.user_name.trim()) {
+                displayName = booking.user_name;
+            } else {
+                displayName = booking.user_email || 'Неизвестно';
+            }
+            
+            const userEmail = booking.user_email || 'Не указан';
 
             let deleteButtonHTML = '';
             if (currentUser && booking.user_id === currentUser.id) {
@@ -575,7 +622,8 @@
                 <p><span class="modal-item-label">Комната:</span> ${booking.room}</p>
                 <p><span class="modal-item-label">Дата:</span> ${new Date(booking.start).toLocaleDateString('ru-RU')}</p>
                 <p><span class="modal-item-label">Время:</span> ${new Date(booking.start).toLocaleTimeString('ru-RU')} - ${new Date(booking.end).toLocaleTimeString('ru-RU')}</p>
-                <p><span class="modal-item-label">Забронировал:</span> ${userName}</p>
+                <p><span class="modal-item-label">Забронировал:</span> ${displayName}</p>
+                <p><span class="modal-item-label">Email:</span> ${userEmail}</p>
                 ${deleteButtonHTML}
             `;
             
@@ -594,25 +642,121 @@
                 return;
             }
 
-            console.log('Попытка удалить бронь с ID:', bookingId);
-
-            // Прямое обращение к Supabase с проверкой владельца
             const { error } = await supabase
                 .from('bookings')
                 .delete()
                 .eq('id', bookingId)
-                .eq('user_id', currentUser.id); // Дополнительная проверка безопасности
+                .eq('user_id', currentUser.id);
 
             if (error) {
-                console.error('Ошибка удаления:', error);
                 alert('Ошибка при удалении брони: ' + error.message);
             } else {
-                console.log('Бронь успешно удалена');
                 alert('Бронь успешно удалена!');
                 document.getElementById('bookingModal').style.display = 'none';
                 loadUserBookings();
                 loadAllBookings();
             }
+        }
+
+        function showSettings() {
+            hideAllCards();
+            document.getElementById('settingsCard').classList.add('active');
+            loadUserSettings();
+        }
+
+        async function loadUserSettings() {
+            if (currentUser) {
+                document.getElementById('settingsEmail').value = currentUser.email;
+                const fullName = currentUser.user_metadata?.full_name || '';
+                document.getElementById('settingsName').value = fullName;
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+            }
+        }
+
+        async function updateProfile() {
+            const newName = document.getElementById('settingsName').value.trim();
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!newName) {
+                showMessage('settingsMessage', 'Имя не может быть пустым', 'error');
+                return;
+            }
+
+            if (newPassword || confirmPassword) {
+                if (newPassword !== confirmPassword) {
+                    showMessage('settingsMessage', 'Пароли не совпадают', 'error');
+                    return;
+                }
+                if (newPassword.length < 6) {
+                    showMessage('settingsMessage', 'Пароль должен содержать минимум 6 символов', 'error');
+                    return;
+                }
+            }
+
+            try {
+                const updateData = {
+                    data: { full_name: newName }
+                };
+
+                if (newPassword) {
+                    updateData.password = newPassword;
+                }
+
+                const { error: authError } = await supabase.auth.updateUser(updateData);
+
+                if (authError) {
+                    showMessage('settingsMessage', 'Ошибка обновления: ' + authError.message, 'error');
+                    return;
+                }
+
+                // Обновляем имя пользователя во всех его бронях
+                const { error: bookingsError } = await supabase
+                    .from('bookings')
+                    .update({ user_name: newName })
+                    .eq('user_id', currentUser.id);
+
+                if (bookingsError) {
+                    console.warn('Не удалось обновить имя в бронях:', bookingsError);
+                    // Не показываем ошибку пользователю, так как основное обновление прошло успешно
+                }
+
+                showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                
+                // Перезагружаем брони, чтобы показать обновленное имя
+                loadUserBookings();
+                loadAllBookings();
+
+            } catch (err) {
+                showMessage('settingsMessage', 'Произошла ошибка при обновлении настроек', 'error');
+            }
+        }
+
+        function hideAllCards() {
+            document.getElementById('authCard').classList.remove('active');
+            document.getElementById('bookingCard').classList.remove('active');
+            document.getElementById('passwordResetCard').classList.remove('active');
+            document.getElementById('settingsCard').classList.remove('active');
+        }
+
+        function showAuthForm() {
+            hideAllCards();
+            document.getElementById('authCard').classList.add('active');
+        }
+
+        function showPasswordReset() {
+            hideAllCards();
+            document.getElementById('passwordResetCard').classList.add('active');
+        }
+
+        function showBookingForm() {
+            hideAllCards();
+            document.getElementById('bookingCard').classList.add('active');
+            loadUserBookings();
+            loadAllBookings();
         }
         
         // Modal close functionality
@@ -625,26 +769,6 @@
                 document.getElementById('bookingModal').style.display = 'none';
             }
         });
-
-        function showAuthForm() {
-            document.getElementById('authCard').classList.add('active');
-            document.getElementById('bookingCard').classList.remove('active');
-            document.getElementById('passwordResetCard').classList.remove('active');
-        }
-
-        function showPasswordReset() {
-            document.getElementById('authCard').classList.remove('active');
-            document.getElementById('bookingCard').classList.remove('active');
-            document.getElementById('passwordResetCard').classList.add('active');
-        }
-
-        function showBookingForm() {
-            document.getElementById('authCard').classList.remove('active');
-            document.getElementById('bookingCard').classList.add('active');
-            document.getElementById('passwordResetCard').classList.remove('active');
-            loadUserBookings();
-            loadAllBookings();
-        }
 
         function showMessage(elementId, text, type) {
             const element = document.getElementById(elementId);
