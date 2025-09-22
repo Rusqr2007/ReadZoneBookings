@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-s<p></p>cale=1.0">
     <title>ReadZone - Бронирование читального зала</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
@@ -73,6 +73,12 @@
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .date-time-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
 
         .btn {
@@ -145,39 +151,6 @@
             margin-top: 5px;
         }
 
-        .time-slots {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .time-slot {
-            padding: 10px;
-            background: #f8f9fa;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
-
-        .time-slot:hover {
-            background: #e9ecef;
-        }
-
-        .time-slot.selected {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-
-        .time-slot.unavailable {
-            background: #f5f5f5;
-            color: #999;
-            cursor: not-allowed;
-        }
-
         .room-info {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             padding: 20px;
@@ -196,6 +169,14 @@
             color: #666;
             font-size: 0.9rem;
         }
+
+        .info-text {
+            color: #555;
+            font-size: 0.9rem;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -203,7 +184,6 @@
         <h1>ReadZoneBookings</h1>
         <p class="subtitle">Бронирование читального зала</p>
 
-        <!-- Форма входа/регистрации -->
         <div class="auth-card active" id="authCard">
             <div class="form-group">
                 <label for="email">Email</label>
@@ -221,32 +201,28 @@
             <div id="authMessage"></div>
         </div>
 
-        <!-- Форма бронирования -->
         <div class="booking-card" id="bookingCard">
             <div class="room-info">
                 <div class="room-title">Читальный зал</div>
-                <div class="room-desc">Тихое место для учебы и работы</div>
+                <div class="room-desc">Место для учебы , работы и отдыха.</div>
             </div>
 
             <div class="form-group">
                 <label for="bookingDate">Дата</label>
-                <input type="date" id="bookingDate" onchange="loadAvailableSlots()">
+                <input type="date" id="bookingDate">
             </div>
 
-            <div class="form-group">
-                <label>Доступное время (максимум 4 часа)</label>
-                <div class="time-slots" id="timeSlots"></div>
+            <div class="form-group date-time-group">
+                <div>
+                    <label for="time-start">Начало</label>
+                    <input type="time" id="time-start" required>
+                </div>
+                <div>
+                    <label for="time-end">Конец</label>
+                    <input type="time" id="time-end" required>
+                </div>
             </div>
-
-            <div class="form-group">
-                <label for="duration">Длительность</label>
-                <select id="duration">
-                    <option value="1">1 час</option>
-                    <option value="2">2 часа</option>
-                    <option value="3">3 часа</option>
-                    <option value="4">4 часа</option>
-                </select>
-            </div>
+            <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
 
             <button class="btn" onclick="createBooking()">Забронировать</button>
             <button class="btn btn-secondary" onclick="signOut()">Выйти</button>
@@ -261,21 +237,17 @@
     </div>
 
     <script>
-        // Настройки Supabase
         const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM';
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
 
-        // Инициализация
         document.addEventListener('DOMContentLoaded', async function() {
-            // Устанавливаем минимальную дату на сегодня
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('bookingDate').value = today;
             document.getElementById('bookingDate').min = today;
             
-            // Проверяем сессию пользователя
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 currentUser = session.user;
@@ -283,72 +255,6 @@
             }
         });
 
-        // Генерация временных слотов
-        function generateTimeSlots() {
-            const slots = [];
-            for (let hour = 9; hour <= 20; hour++) {
-                slots.push(`${hour.toString().padStart(2, '0')}:00`);
-            }
-            return slots;
-        }
-
-        // Загрузка доступных слотов
-        async function loadAvailableSlots() {
-            const selectedDate = document.getElementById('bookingDate').value;
-            const slotsContainer = document.getElementById('timeSlots');
-            
-            if (!selectedDate) return;
-            
-            const timeSlots = generateTimeSlots();
-            slotsContainer.innerHTML = '';
-            
-            // Получаем брони из Supabase
-            const { data: bookings } = await supabase
-                .from('bookings')
-                .select('*')
-                .eq('room', 'Читальный зал')
-                .gte('start', selectedDate + 'T00:00:00')
-                .lt('start', selectedDate + 'T23:59:59');
-            
-            timeSlots.forEach(slot => {
-                const slotElement = document.createElement('div');
-                slotElement.className = 'time-slot';
-                slotElement.textContent = slot;
-                slotElement.onclick = () => selectTimeSlot(slotElement, slot);
-                
-                // Проверяем занятость слота
-                const isBooked = bookings && bookings.some(booking => {
-                    const startTime = new Date(booking.start);
-                    const endTime = new Date(booking.end);
-                    const slotTime = new Date(selectedDate + 'T' + slot + ':00');
-                    
-                    return slotTime >= startTime && slotTime < endTime;
-                });
-                
-                if (isBooked) {
-                    slotElement.classList.add('unavailable');
-                    slotElement.onclick = null;
-                }
-                
-                slotsContainer.appendChild(slotElement);
-            });
-        }
-
-        // Выбор временного слота
-        let selectedTime = null;
-        function selectTimeSlot(element, time) {
-            if (element.classList.contains('unavailable')) return;
-            
-            // Убираем выделение с других слотов
-            document.querySelectorAll('.time-slot').forEach(slot => {
-                slot.classList.remove('selected');
-            });
-            
-            element.classList.add('selected');
-            selectedTime = time;
-        }
-
-        // Регистрация
         async function signUp() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
@@ -375,7 +281,6 @@
             }
         }
 
-        // Вход
         async function signIn() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
@@ -399,33 +304,38 @@
             }
         }
 
-        // Выход
         async function signOut() {
             await supabase.auth.signOut();
             currentUser = null;
             showAuthForm();
         }
 
-        // Создание брони
         async function createBooking() {
-            if (!selectedTime) {
-                showMessage('bookingMessage', 'Выберите время', 'error');
-                return;
-            }
-            
             const date = document.getElementById('bookingDate').value;
-            const duration = parseInt(document.getElementById('duration').value);
-            
-            if (!date) {
-                showMessage('bookingMessage', 'Выберите дату', 'error');
+            const timeStart = document.getElementById('time-start').value;
+            const timeEnd = document.getElementById('time-end').value;
+
+            if (!date || !timeStart || !timeEnd) {
+                showMessage('bookingMessage', 'Заполните все поля', 'error');
                 return;
             }
             
-            // Создаем даты начала и конца
-            const startTime = new Date(date + 'T' + selectedTime + ':00');
-            const endTime = new Date(startTime.getTime() + duration * 60 * 60 * 1000);
-            
-            const { data, error } = await supabase
+            const startTime = new Date(date + 'T' + timeStart);
+            const endTime = new Date(date + 'T' + timeEnd);
+
+            if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) {
+                showMessage('bookingMessage', 'Неверная дата или время', 'error');
+                return;
+            }
+
+            // Проверка, что бронь не превышает 4 часа
+            const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+            if (durationHours > 4.01) { // 4.01 для небольшого запаса
+                showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
+                return;
+            }
+
+            const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
@@ -440,17 +350,9 @@
             } else {
                 showMessage('bookingMessage', 'Бронь создана успешно!', 'success');
                 loadUserBookings();
-                loadAvailableSlots(); // Обновляем доступные слоты
-                
-                // Сбрасываем выбор
-                selectedTime = null;
-                document.querySelectorAll('.time-slot').forEach(slot => {
-                    slot.classList.remove('selected');
-                });
             }
         }
 
-        // Загрузка броней пользователя
         async function loadUserBookings() {
             const { data: bookings, error } = await supabase
                 .from('bookings')
@@ -479,21 +381,17 @@
             }).join('');
         }
 
-        // Показать форму входа
         function showAuthForm() {
             document.getElementById('authCard').classList.add('active');
             document.getElementById('bookingCard').classList.remove('active');
         }
 
-        // Показать форму бронирования
         function showBookingForm() {
             document.getElementById('authCard').classList.remove('active');
             document.getElementById('bookingCard').classList.add('active');
-            loadAvailableSlots();
             loadUserBookings();
         }
 
-        // Показать сообщение
         function showMessage(elementId, text, type) {
             const element = document.getElementById(elementId);
             element.innerHTML = `<div class="${type}">${text}</div>`;
@@ -502,7 +400,6 @@
             }, 5000);
         }
 
-        // Форматирование даты
         function formatDate(dateString) {
             const date = new Date(dateString);
             return date.toLocaleDateString('ru-RU');
