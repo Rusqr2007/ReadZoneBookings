@@ -17,7 +17,7 @@
             --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
             --border-radius: 16px;
         }
-        
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             padding: 22px;
@@ -38,7 +38,7 @@
             width: 100%;
             text-align: center;
         }
-        
+
         h2 {
             font-size: 2rem;
             font-weight: 700;
@@ -83,11 +83,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
         }
 
         .booking-item:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .booking-item:active {
+            transform: translateY(0);
         }
 
         .booking-info {
@@ -95,6 +100,7 @@
             flex-direction: column;
             align-items: flex-start;
         }
+
         .booking-actions {
             display: flex;
             align-items: center;
@@ -118,23 +124,6 @@
             text-align: center;
             margin-top: 10px;
         }
-        
-        .delete-btn {
-            background: none;
-            border: 1px solid #ff4d4f;
-            color: #ff4d4f;
-            padding: 6px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-        
-        .delete-btn:hover {
-            background-color: #ff4d4f;
-            color: white;
-        }
 
         .back-link {
             display: block;
@@ -152,6 +141,98 @@
         #info b {
             font-weight: 700;
         }
+        
+        /* Стили для модального окна */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            text-align: left;
+            position: relative;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .close-btn {
+            color: #aaa;
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            text-align: center;
+        }
+
+        .modal-item {
+            margin-bottom: 15px;
+        }
+
+        .modal-item-label {
+            font-weight: 500;
+            color: #555;
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .modal-item-value {
+            font-size: 1rem;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .modal-delete-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: none;
+            border: 2px solid #ff4d4f;
+            color: #ff4d4f;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            margin-top: 20px;
+        }
+        
+        .modal-delete-btn:hover {
+            background-color: #ff4d4f;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -162,10 +243,23 @@
     <div class="back-link"><a href="/">Вернуться на главную</a></div>
 </div>
 
+<div id="bookingModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <div class="modal-title">Информация о брони</div>
+        
+        <div id="modalDetails">
+            </div>
+    </div>
+</div>
+
 <script>
     const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
     const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let currentUser = null;
+    let allBookings = [];
 
     async function load() {
         const {data: {user}} = await supabase.auth.getUser();
@@ -173,47 +267,51 @@
             location.href = '/';
             return;
         }
+        currentUser = user;
+        
         document.getElementById('info').innerHTML = `<b>${user.email}</b> (id: ${user.id}) <button id="logout">Выйти</button>`;
         document.getElementById('logout').onclick = async () => {
             await supabase.auth.signOut();
             location.href = '/';
         };
 
-        const res = await fetch('/.netlify/functions/list-bookings?user_id=' + encodeURIComponent(user.id));
-        const arr = await res.json();
+        const { data, error } = await supabase
+            .from('bookings')
+            .select('*, user:user_id(raw_user_meta_data)')
+            .order('start', { ascending: true });
         
-        if (!arr || arr.length === 0) {
+        if (error || !data || data.length === 0) {
             document.getElementById('bookings').innerHTML = '<div class="muted">Броней пока нет</div>';
             return;
         }
         
-        document.getElementById('bookings').innerHTML = arr.map(b => {
+        allBookings = data;
+        
+        document.getElementById('bookings').innerHTML = allBookings.map(b => {
             const startDate = new Date(b.start).toLocaleString('ru-RU', { timeZone: 'UTC' });
             const endDate = new Date(b.end).toLocaleString('ru-RU', { timeZone: 'UTC' });
             
             return `
-                <div class="booking-item">
+                <div class="booking-item" data-id="${b.id}">
                     <div class="booking-info">
                         <div class="booking-room">${b.room}</div>
                         <div class="booking-time">${startDate} → ${endDate}</div>
-                    </div>
-                    <div class="booking-actions">
-                        <button class="delete-btn" data-id="${b.id}">Удалить</button>
                     </div>
                 </div>
             `;
         }).join('');
 
-        document.querySelectorAll('.delete-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const bookingId = e.target.getAttribute('data-id');
-                if (confirm('Вы уверены, что хотите отменить эту бронь?')) {
-                    await deleteBooking(bookingId);
+        document.querySelectorAll('.booking-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const bookingId = e.currentTarget.getAttribute('data-id');
+                const booking = allBookings.find(b => b.id == bookingId);
+                if(booking) {
+                    showBookingDetails(booking);
                 }
             });
         });
     }
-    
+
     async function deleteBooking(bookingId) {
         const { error } = await supabase
             .from('bookings')
@@ -224,11 +322,62 @@
             alert('Ошибка при удалении брони: ' + error.message);
         } else {
             alert('Бронь успешно удалена!');
-            load(); // Обновляем список броней
+            load();
+            document.getElementById('bookingModal').style.display = 'none';
         }
     }
 
+    function showBookingDetails(booking) {
+        const modal = document.getElementById('bookingModal');
+        const modalDetails = document.getElementById('modalDetails');
+        
+        const userName = booking.user && booking.user.raw_user_meta_data && booking.user.raw_user_meta_data.full_name ? booking.user.raw_user_meta_data.full_name : booking.user_email || 'Неизвестно';
+        const userEmail = booking.user_email;
+        
+        let deleteButtonHTML = '';
+        if (currentUser && booking.user_id === currentUser.id) {
+            deleteButtonHTML = `<button class="modal-delete-btn" onclick="deleteBooking(${booking.id})">Удалить</button>`;
+        }
+        
+        modalDetails.innerHTML = `
+            <div class="modal-item">
+                <span class="modal-item-label">Имя пользователя:</span>
+                <span class="modal-item-value">${userName}</span>
+            </div>
+            <div class="modal-item">
+                <span class="modal-item-label">Email:</span>
+                <span class="modal-item-value">${userEmail}</span>
+            </div>
+            <div class="modal-item">
+                <span class="modal-item-label">Комната:</span>
+                <span class="modal-item-value">${booking.room}</span>
+            </div>
+            <div class="modal-item">
+                <span class="modal-item-label">Начало:</span>
+                <span class="modal-item-value">${new Date(booking.start).toLocaleString('ru-RU')}</span>
+            </div>
+            <div class="modal-item">
+                <span class="modal-item-label">Конец:</span>
+                <span class="modal-item-value">${new Date(booking.end).toLocaleString('ru-RU')}</span>
+            </div>
+            ${deleteButtonHTML}
+        `;
+        
+        modal.style.display = 'flex';
+    }
+
     document.addEventListener('DOMContentLoaded', load);
+    
+    // Закрытие модального окна
+    document.querySelector('.close-btn').addEventListener('click', () => {
+        document.getElementById('bookingModal').style.display = 'none';
+    });
+    
+    window.addEventListener('click', (e) => {
+        if (e.target == document.getElementById('bookingModal')) {
+            document.getElementById('bookingModal').style.display = 'none';
+        }
+    });
 </script>
 </body>
 </html>
