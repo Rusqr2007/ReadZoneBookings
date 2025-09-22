@@ -338,7 +338,9 @@
                 return;
             }
 
-            const { error } = await supabase.auth.resetPasswordForEmail(email);
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: 'https://readzonebookings.netlify.app/password-reset.html'
+            });
 
             if (error) {
                 showMessage('resetMessage', 'Ошибка: ' + error.message, 'error');
