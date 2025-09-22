@@ -1,23 +1,185 @@
-<!-- admin.html -->
 <!doctype html>
 <html lang="ru">
-<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin — брони</title>
-<style>body{font-family:system-ui;padding:22px;background:#f6f8fb} .card{background:#fff;padding:18px;border-radius:12px;max-width:920px;box-shadow:0 10px 30px rgba(0,0,0,.05)} pre{white-space:pre-wrap}</style>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Профиль — Мои брони</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #6a11cb;
+            --secondary-color: #2575fc;
+            --background-color: #f6f8fb;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --subtle-text-color: #777;
+            --border-color: #e0e0e0;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --border-radius: 16px;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 22px;
+            background: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: var(--card-background);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            max-width: 720px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            text-align: center;
+        }
+        
+        h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        #info {
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 1.1rem;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        #logout {
+            background-color: #f1f1f1;
+            color: var(--subtle-text-color);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-left: 10px;
+        }
+
+        #logout:hover {
+            background-color: #e9e9e9;
+        }
+
+        #bookings {
+            text-align: left;
+        }
+
+        .booking-item {
+            background: #f9f9f9;
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 5px solid var(--secondary-color);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .booking-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .booking-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .booking-room {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 1.1rem;
+        }
+
+        .booking-time {
+            color: var(--subtle-text-color);
+            font-size: 0.9rem;
+        }
+
+        .muted {
+            color: var(--subtle-text-color);
+            font-style: italic;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .back-link {
+            display: block;
+            margin-top: 20px;
+            font-size: 1rem;
+            color: var(--subtle-text-color);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: var(--text-color);
+        }
+
+        #info b {
+            font-weight: 700;
+        }
+    </style>
 </head>
 <body>
-<div class="card">
-  <h2>Админ — Все брони</h2>
-  <div id="out">Загрузка...</div>
+<div class="container">
+    <h2>Мой профиль</h2>
+    <div id="info">Загрузка...</div>
+    <div id="bookings"></div>
+    <div class="back-link"><a href="/">Вернуться на главную</a></div>
 </div>
 
 <script>
-async function loadAll(){
-  const res = await fetch('/.netlify/functions/list-bookings');
-  if(!res.ok){ document.getElementById('out').innerText = 'Ошибка: ' + res.status; return; }
-  const arr = await res.json();
-  document.getElementById('out').innerHTML = arr.map(b=>`<div style="padding:8px;border-bottom:1px solid #f1f5f9"><b>${b.room}</b> — ${b.user_email||b.user_id}<div class="muted">${new Date(b.start).toLocaleString()} → ${new Date(b.end).toLocaleString()}</div></div>`).join('');
-}
-loadAll();
+    const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
+    const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function load() {
+        const {data: {user}} = await supabase.auth.getUser();
+        if (!user) {
+            location.href = '/';
+            return;
+        }
+        document.getElementById('info').innerHTML = `<b>${user.email}</b> (id: ${user.id}) <button id=\"logout\">Выйти</button>`;
+        document.getElementById('logout').onclick = async () => {
+            await supabase.auth.signOut();
+            location.href = '/';
+        };
+
+        const res = await fetch('/.netlify/functions/list-bookings?user_id=' + encodeURIComponent(user.id));
+        const arr = await res.json();
+        
+        if (!arr || arr.length === 0) {
+            document.getElementById('bookings').innerHTML = '<div class="muted">Броней пока нет</div>';
+            return;
+        }
+        
+        document.getElementById('bookings').innerHTML = arr.map(b => {
+            const startDate = new Date(b.start).toLocaleString('ru-RU', { timeZone: 'UTC' });
+            const endDate = new Date(b.end).toLocaleString('ru-RU', { timeZone: 'UTC' });
+            
+            return `
+                <div class="booking-item">
+                    <div class="booking-info">
+                        <div class="booking-room">${b.room}</div>
+                        <div class="booking-time">${startDate} → ${endDate}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
 </script>
 </body>
 </html>
