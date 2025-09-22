@@ -72,6 +72,7 @@
         #bookings {
             text-align: left;
         }
+
         .booking-item {
             background: #f9f9f9;
             padding: 18px;
