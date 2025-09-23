@@ -392,9 +392,33 @@
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 currentUser = session.user;
+                // Удаляем старые брони при загрузке
+                await cleanupOldBookings();
                 showBookingForm();
             }
         });
+
+        async function cleanupOldBookings() {
+            try {
+                const now = new Date();
+                const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+                // Удаляем все брони, которые закончились более 24 часов назад
+                const { error, count } = await supabase
+                    .from('bookings')
+                    .delete()
+                    .lt('end', twentyFourHoursAgo.toISOString());
+
+                if (error) {
+                    console.error('Ошибка при удалении старых броней:', error);
+                } else if (count > 0) {
+                    console.log(`Удалено ${count} старых броней`);
+                }
+
+            } catch (error) {
+                console.error('Общая ошибка при очистке:', error);
+            }
+        }
 
         async function signUp() {
             const name = document.getElementById('name').value.trim();
