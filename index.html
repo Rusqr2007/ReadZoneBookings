@@ -146,11 +146,11 @@
     // гарантируем, что профиль есть (решает проблему FK)
     const safeName = currentUser.user_metadata?.user_name || null;
     const safeEmail = currentUser.email || null;
-    const { error: upsertErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: safeName, email: safeEmail, show_email: false }], { onConflict: 'id' });
+    const { error: upsertErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: safeName, email: safeEmail, display_type: 'name' }], { onConflict: 'id' });
     if(upsertErr) console.error('profile ensure error', upsertErr);
 
     // получаем профиль (если админ — редирект)
-    const { data: profile, error } = await supabase.from('profiles').select('user_name, show_email, is_admin').eq('id', currentUser.id).maybeSingle();
+    const { data: profile, error } = await supabase.from('profiles').select('user_name, display_type, is_admin').eq('id', currentUser.id).maybeSingle();
     if(error) console.error('Не удалось загрузить профиль', error);
     else if(profile?.is_admin){ window.location.href = '/admin.html'; return; }
 
@@ -173,7 +173,7 @@
     if(error){ showMessage('authMessage', error.message); return; }
 
     const userId = data?.user?.id;
-    if(userId){ const { error: pe } = await supabase.from('profiles').upsert([{ id: userId, user_name: name, show_email: false, email }], { onConflict: 'id' }); if(pe) console.error('profile upsert error', pe); }
+    if(userId){ const { error: pe } = await supabase.from('profiles').upsert([{ id: userId, user_name: name, display_type: 'name', email }], { onConflict: 'id' }); if(pe) console.error('profile upsert error', pe); }
     showMessage('authMessage','Регистрация инициирована. Проверьте почту для подтверждения.', 'success');
   }
 
@@ -198,12 +198,12 @@
   // --- PROFILE / SETTINGS ---
   async function loadUserSettings(){ 
     if(!currentUser) return; 
-    const { data: profile } = await supabase.from('profiles').select('user_name, show_email').eq('id', currentUser.id).maybeSingle(); 
+    const { data: profile } = await supabase.from('profiles').select('user_name, display_type').eq('id', currentUser.id).maybeSingle(); 
     el('settingsName').value = profile?.user_name || currentUser.user_metadata?.user_name || ''; 
     el('settingsEmail').value = currentUser.email || ''; 
     
     // Устанавливаем радиокнопку в зависимости от настройки
-    if (profile?.show_email) {
+    if (profile?.display_type === 'email') {
       el('privacy-email').checked = true;
     } else {
       el('privacy-name').checked = true;
@@ -218,13 +218,13 @@
     const newName = el('settingsName').value.trim(); 
     const newPassword = el('newPassword').value; 
     const confirmPassword = el('confirmPassword').value; 
-    const showEmail = el('privacy-email').checked; // true - показывать email, false - показывать имя
+    const displayType = el('privacy-email').checked ? 'email' : 'name';
     
     if(!newName){ showMessage('settingsMessage','Имя не может быть пустым'); return; } 
     if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } 
     if(newPassword && newPassword.length < 6){ showMessage('settingsMessage','Пароль должен быть минимум 6 символов'); return; }
 
-    const { error: pErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: newName, show_email: showEmail }], { onConflict: 'id' });
+    const { error: pErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: newName, display_type: displayType }], { onConflict: 'id' });
     if(pErr){ showMessage('settingsMessage','Ошибка обновления профиля: ' + pErr.message); return; }
 
     let authErr = null;
@@ -315,11 +315,10 @@
       return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div><div><strong>Ваша бронь</strong></div>${commentHtml}</div>`;
     }
     
-    // Для чужих броней учитываем глобальную настройку приватности пользователя
+    // Для чужих броней учитываем настройку display_type из профиля пользователя
     let displayName = 'Аноним';
     
-    // Используем настройку из профиля пользователя
-    if (b.profile_show_email && b.profile_email) {
+    if (b.profile_display_type === 'email' && b.profile_email) {
       displayName = b.profile_email;
     } else if (b.profile_user_name) {
       displayName = b.profile_user_name;
@@ -360,7 +359,7 @@
       displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним';
     } else {
       // Используем настройку из профиля пользователя
-      if (b.profile_show_email && b.profile_email) {
+      if (b.profile_display_type === 'email' && b.profile_email) {
         displayName = b.profile_email;
       } else if (b.profile_user_name) {
         displayName = b.profile_user_name;
