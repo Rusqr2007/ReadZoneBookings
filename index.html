@@ -383,19 +383,35 @@
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
-        let allBookings = [];
+        
+        // --- НОВАЯ ФУНКЦИЯ ДЛЯ ПРОВЕРКИ И ПЕРЕНАПРАВЛЕНИЯ ---
+        async function checkUserAndRedirect() {
+            const { data: { user } } = await supabase.auth.getUser();
 
+            if (user) {
+                // Если у пользователя есть метаданные и в них есть поле is_admin = true
+                if (user.user_metadata && user.user_metadata.is_admin) {
+                    console.log("Администратор вошёл в систему. Перенаправление...");
+                    window.location.href = '/admin.html';
+                } else {
+                    // Обычный пользователь, показываем форму бронирования
+                    currentUser = user;
+                    showBookingForm();
+                }
+            } else {
+                // Пользователь не авторизован, показываем форму входа
+                showAuthForm();
+            }
+        }
+        
         document.addEventListener('DOMContentLoaded', async function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('bookingDate').value = today;
             document.getElementById('bookingDate').min = today;
             
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                currentUser = session.user;
-                await cleanupOldBookings();
-                showBookingForm();
-            }
+            // Запускаем новую функцию для проверки пользователя и перенаправления
+            await cleanupOldBookings();
+            await checkUserAndRedirect();
         });
 
         async function cleanupOldBookings() {
@@ -413,7 +429,6 @@
                 } else if (count > 0) {
                     console.log(`Удалено ${count} старых броней`);
                 }
-
             } catch (error) {
                 console.error('Общая ошибка при очистке:', error);
             }
@@ -468,9 +483,9 @@
             if (error) {
                 showMessage('authMessage', error.message, 'error');
             } else {
-                currentUser = data.user;
+                // --- ВЫЗЫВАЕМ НОВУЮ ФУНКЦИЮ ПОСЛЕ УСПЕШНОГО ВХОДА ---
                 showMessage('authMessage', 'Вход выполнен!', 'success');
-                setTimeout(showBookingForm, 1000);
+                setTimeout(checkUserAndRedirect, 1000);
             }
         }
 
@@ -582,7 +597,6 @@
                         return false;
                     }
                 }
-
                 return true;
             } catch (err) {
                 console.error('Ошибка при проверке доступности:', err);
@@ -617,52 +631,44 @@
                 `;
             }).join('');
             
-            addClickListeners();
+            addClickListeners(bookings);
         }
 
         async function loadAllBookings() {
-            try {
-                const { data: bookings, error } = await supabase
-                    .from('bookings')
-                    .select('*')
-                    .order('start', { ascending: true });
-
-                const allBookingsList = document.getElementById('allBookingsList');
-                
-                if (error || !bookings || bookings.length === 0) {
-                    allBookingsList.innerHTML = '<p>Броней пока нет</p>';
-                    allBookings = [];
-                    return;
-                }
-
-                allBookings = bookings;
-                
-                allBookingsList.innerHTML = bookings.map(booking => {
-                    const startTime = new Date(booking.start);
-                    const endTime = new Date(booking.end);
-                    
-                    const displayName = booking.user_email || 'Неизвестно';
-                    
-                    return `
-                        <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                            <div class="booking-time">${displayName} — ${booking.room}</div>
-                            <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
-                        </div>
-                    `;
-                }).join('');
-                
-                addClickListeners();
-            } catch (error) {
-                console.error('Error loading all bookings:', error);
-                document.getElementById('allBookingsList').innerHTML = '<p>Ошибка загрузки броней</p>';
+            const { data: bookings, error } = await supabase
+                .from('bookings')
+                .select('*')
+                .order('start', { ascending: true });
+            
+            const allBookingsList = document.getElementById('allBookingsList');
+            
+            if (error || !bookings || bookings.length === 0) {
+                allBookingsList.innerHTML = '<p>Броней пока нет</p>';
+                return;
             }
+
+            allBookingsList.innerHTML = bookings.map(booking => {
+                const startTime = new Date(booking.start);
+                const endTime = new Date(booking.end);
+                
+                const displayName = booking.user_email || 'Неизвестно';
+                
+                return `
+                    <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
+                        <div class="booking-time">${displayName} — ${booking.room}</div>
+                        <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            addClickListeners(bookings);
         }
         
-        function addClickListeners() {
+        function addClickListeners(bookings) {
             document.querySelectorAll('.booking-item').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const bookingId = e.currentTarget.getAttribute('data-id');
-                    const booking = allBookings.find(b => b.id == bookingId);
+                    const booking = bookings.find(b => b.id == bookingId);
                     if (booking) {
                         showBookingDetails(booking);
                     }
@@ -670,7 +676,7 @@
             });
         }
         
-        function showBookingDetails(booking) {
+        async function showBookingDetails(booking) {
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
@@ -705,29 +711,19 @@
                 return;
             }
 
-            try {
-                const { error } = await supabase
-                    .from('bookings')
-                    .delete()
-                    .eq('id', bookingId)
-                    .eq('user_id', currentUser.id);
+            const { error } = await supabase
+                .from('bookings')
+                .delete()
+                .eq('id', bookingId)
+                .eq('user_id', currentUser.id);
 
-                if (error) {
-                    console.error('Delete error:', error);
-                    alert('Ошибка при удалении брони: ' + error.message);
-                    return;
-                }
-
+            if (error) {
+                alert('Ошибка при удалении брони: ' + error.message);
+            } else {
                 alert('Бронь успешно удалена!');
                 document.getElementById('bookingModal').style.display = 'none';
-                
-                // Перезагружаем списки
-                await loadUserBookings();
-                await loadAllBookings();
-                
-            } catch (error) {
-                console.error('Delete error:', error);
-                alert('Ошибка при удалении брони: ' + error.message);
+                loadUserBookings();
+                loadAllBookings();
             }
         }
 
@@ -815,7 +811,6 @@
             loadAllBookings();
         }
         
-        // Modal close functionality
         document.querySelector('.close-btn').addEventListener('click', () => {
             document.getElementById('bookingModal').style.display = 'none';
         });
