@@ -510,15 +510,11 @@
                 return;
             }
 
-            // Получаем имя пользователя
-            const userName = currentUser.user_metadata?.full_name || currentUser.email;
-
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
                     user_email: currentUser.email,
-                    user_name: userName,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
                     end: endTime.toISOString()
@@ -580,13 +576,8 @@
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
                 
-                // Определяем отображаемое имя пользователя
-                let displayName = '';
-                if (booking.user_name && booking.user_name.trim()) {
-                    displayName = `${booking.user_name} (${booking.user_email || 'email не указан'})`;
-                } else {
-                    displayName = booking.user_email || 'Неизвестно';
-                }
+                // Показываем только email
+                const displayName = booking.user_email || 'Неизвестно';
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
@@ -615,14 +606,7 @@
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            // Определяем отображаемое имя пользователя
-            let displayName = '';
-            if (booking.user_name && booking.user_name.trim()) {
-                displayName = booking.user_name;
-            } else {
-                displayName = booking.user_email || 'Неизвестно';
-            }
-            
+            // Показываем только email
             const userEmail = booking.user_email || 'Не указан';
 
             let deleteButtonHTML = '';
@@ -635,8 +619,7 @@
                 <p><span class="modal-item-label">Комната:</span> ${booking.room}</p>
                 <p><span class="modal-item-label">Дата:</span> ${new Date(booking.start).toLocaleDateString('ru-RU')}</p>
                 <p><span class="modal-item-label">Время:</span> ${new Date(booking.start).toLocaleTimeString('ru-RU')} - ${new Date(booking.end).toLocaleTimeString('ru-RU')}</p>
-                <p><span class="modal-item-label">Забронировал:</span> ${displayName}</p>
-                <p><span class="modal-item-label">Email:</span> ${userEmail}</p>
+                <p><span class="modal-item-label">Забронировал:</span> ${userEmail}</p>
                 ${deleteButtonHTML}
             `;
             
@@ -717,32 +700,15 @@
                     updateData.password = newPassword;
                 }
 
-                const { error: authError } = await supabase.auth.updateUser(updateData);
+                const { error } = await supabase.auth.updateUser(updateData);
 
-                if (authError) {
-                    showMessage('settingsMessage', 'Ошибка обновления: ' + authError.message, 'error');
-                    return;
+                if (error) {
+                    showMessage('settingsMessage', 'Ошибка обновления: ' + error.message, 'error');
+                } else {
+                    showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
                 }
-
-                // Обновляем имя пользователя во всех его бронях
-                const { error: bookingsError } = await supabase
-                    .from('bookings')
-                    .update({ user_name: newName })
-                    .eq('user_id', currentUser.id);
-
-                if (bookingsError) {
-                    console.warn('Не удалось обновить имя в бронях:', bookingsError);
-                    // Не показываем ошибку пользователю, так как основное обновление прошло успешно
-                }
-
-                showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
-                document.getElementById('newPassword').value = '';
-                document.getElementById('confirmPassword').value = '';
-                
-                // Перезагружаем брони, чтобы показать обновленное имя
-                loadUserBookings();
-                loadAllBookings();
-
             } catch (err) {
                 showMessage('settingsMessage', 'Произошла ошибка при обновлении настроек', 'error');
             }
