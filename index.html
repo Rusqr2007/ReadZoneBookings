@@ -66,7 +66,7 @@
             font-size: 0.9rem;
         }
 
-        input, select {
+        input, select, textarea {
             width: 100%;
             padding: 15px;
             border: 2px solid #e1e5e9;
@@ -74,9 +74,10 @@
             font-size: 16px;
             transition: all 0.3s ease;
             background: white;
+            resize: vertical;
         }
 
-        input:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -156,6 +157,14 @@
         .booking-duration {
             color: #666;
             font-size: 0.9rem;
+        }
+        
+        .booking-comment {
+            font-size: 0.9rem;
+            color: #444;
+            margin-top: 5px;
+            font-style: italic;
+            white-space: pre-wrap; /* Сохраняет переносы строк */
         }
 
         .error {
@@ -351,6 +360,11 @@
                 </div>
             </div>
             <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
+            
+            <div class="form-group">
+                <label for="bookingComment">Комментарий</label>
+                <textarea id="bookingComment" placeholder="Цель бронирования (например, подготовка к экзамену, встреча с командой)"></textarea>
+            </div>
 
             <button class="btn" onclick="createBooking()">Забронировать</button>
             <button class="btn btn-secondary" onclick="signOut()">Выйти</button>
@@ -525,6 +539,7 @@ async function checkUserAndRedirect() {
             const date = document.getElementById('bookingDate').value;
             const timeStart = document.getElementById('time-start').value;
             const timeEnd = document.getElementById('time-end').value;
+            const comment = document.getElementById('bookingComment').value.trim();
 
             if (!date || !timeStart || !timeEnd) {
                 showMessage('bookingMessage', 'Заполните все поля', 'error');
@@ -569,7 +584,8 @@ async function checkUserAndRedirect() {
                     user_email: currentUser.email,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
-                    end: endTime.toISOString()
+                    end: endTime.toISOString(),
+                    comment: comment
                 }]);
             
             if (error) {
@@ -632,11 +648,13 @@ async function checkUserAndRedirect() {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
                 const duration = Math.round((endTime - startTime) / (1000 * 60 * 60));
+                const commentHtml = booking.comment ? `<div class="booking-comment">${booking.comment}</div>` : '';
                 
                 return `
                     <div class="booking-item" data-id="${booking.id}" data-user-id="${booking.user_id}">
                         <div class="booking-time">${startTime.toLocaleDateString('ru-RU')} в ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
                         <div class="booking-duration">Длительность: ${duration} час(а)</div>
+                        ${commentHtml}
                     </div>
                 `;
             }).join('');
@@ -662,11 +680,13 @@ async function checkUserAndRedirect() {
                 const endTime = new Date(booking.end);
                 
                 const displayName = booking.user_email || 'Неизвестно';
+                const commentHtml = booking.comment ? `<div class="booking-comment">${booking.comment}</div>` : '';
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
                         <div class="booking-time">${displayName} — ${booking.room}</div>
                         <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                        ${commentHtml}
                     </div>
                 `;
             }).join('');
@@ -691,6 +711,7 @@ async function checkUserAndRedirect() {
             const modalInfo = document.getElementById('modalInfo');
             
             const userEmail = booking.user_email || 'Не указан';
+            const commentHtml = booking.comment ? `<p><span class="modal-item-label">Комментарий:</span> ${booking.comment}</p>` : '';
 
             let deleteButtonHTML = '';
             if (currentUser && booking.user_id === currentUser.id) {
@@ -703,6 +724,7 @@ async function checkUserAndRedirect() {
                 <p><span class="modal-item-label">Дата:</span> ${new Date(booking.start).toLocaleDateString('ru-RU')}</p>
                 <p><span class="modal-item-label">Время:</span> ${new Date(booking.start).toLocaleTimeString('ru-RU')} - ${new Date(booking.end).toLocaleTimeString('ru-RU')}</p>
                 <p><span class="modal-item-label">Забронировал:</span> ${userEmail}</p>
+                ${commentHtml}
                 ${deleteButtonHTML}
             `;
             
