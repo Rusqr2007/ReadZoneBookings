@@ -640,18 +640,38 @@
         }
 
         async function loadAllBookings() {
-            const { data: bookings, error } = await supabase
-                .from('bookings')
-                .select('*')
-                .order('start', { ascending: true });
-            
-            const allBookingsList = document.getElementById('allBookingsList');
-            
-            if (error || !bookings || bookings.length === 0) {
-                allBookingsList.innerHTML = '<p>Броней пока нет</p>';
-                return;
-            }
+    try {
+        const response = await fetch('/.netlify/functions/list-bookings');
+        const bookings = await response.json();
 
+        const allBookingsList = document.getElementById('allBookingsList');
+        
+        if (!bookings || bookings.length === 0) {
+            allBookingsList.innerHTML = '<p>Броней пока нет</p>';
+            return;
+        }
+
+        allBookingsList.innerHTML = bookings.map(booking => {
+            const startTime = new Date(booking.start);
+            const endTime = new Date(booking.end);
+            
+            // Показываем только email
+            const displayName = booking.user_email || 'Неизвестно';
+            
+            return `
+                <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
+                    <div class="booking-time">${displayName} — ${booking.room}</div>
+                    <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                </div>
+            `;
+        }).join('');
+        
+        addClickListeners(bookings);
+    } catch (error) {
+        console.error('Error loading all bookings:', error);
+        document.getElementById('allBookingsList').innerHTML = '<p>Ошибка загрузки броней</p>';
+    }
+}
             allBookingsList.innerHTML = bookings.map(booking => {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
