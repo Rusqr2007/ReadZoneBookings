@@ -484,24 +484,41 @@
             }
             
             const startTime = new Date(date + 'T' + timeStart);
-            const endTime = new Date(date + 'T' + timeEnd);
+            let endTime = new Date(date + 'T' + timeEnd);
 
-            if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) {
+            // Если время окончания меньше времени начала, значит бронь переходит на следующий день
+            if (endTime <= startTime) {
+                endTime.setDate(endTime.getDate() + 1);
+            }
+
+            if (isNaN(startTime) || isNaN(endTime)) {
                 showMessage('bookingMessage', 'Неверная дата или время', 'error');
                 return;
             }
 
             const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+            
+            // Проверяем, что бронь не превышает 4 часа
             if (durationHours > 4.01) {
                 showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
                 return;
             }
+
+            // Проверяем, что бронь не превышает 24 часа (защита от ошибок)
+            if (durationHours > 24) {
+                showMessage('bookingMessage', 'Некорректное время бронирования', 'error');
+                return;
+            }
+
+            // Получаем имя пользователя
+            const userName = currentUser.user_metadata?.full_name || currentUser.email;
 
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
                     user_email: currentUser.email,
+                    user_name: userName,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
                     end: endTime.toISOString()
@@ -562,11 +579,18 @@
             allBookingsList.innerHTML = bookings.map(booking => {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
-                const userName = booking.user_email || 'Неизвестно';
+                
+                // Определяем отображаемое имя пользователя
+                let displayName = '';
+                if (booking.user_name && booking.user_name.trim()) {
+                    displayName = `${booking.user_name} (${booking.user_email || 'email не указан'})`;
+                } else {
+                    displayName = booking.user_email || 'Неизвестно';
+                }
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${userName} — ${booking.room}</div>
+                        <div class="booking-time">${displayName} — ${booking.room}</div>
                         <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
                     </div>
                 `;
@@ -591,7 +615,15 @@
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            const userName = booking.user_email || 'Неизвестно';
+            // Определяем отображаемое имя пользователя
+            let displayName = '';
+            if (booking.user_name && booking.user_name.trim()) {
+                displayName = booking.user_name;
+            } else {
+                displayName = booking.user_email || 'Неизвестно';
+            }
+            
+            const userEmail = booking.user_email || 'Не указан';
 
             let deleteButtonHTML = '';
             if (currentUser && booking.user_id === currentUser.id) {
@@ -603,7 +635,8 @@
                 <p><span class="modal-item-label">Комната:</span> ${booking.room}</p>
                 <p><span class="modal-item-label">Дата:</span> ${new Date(booking.start).toLocaleDateString('ru-RU')}</p>
                 <p><span class="modal-item-label">Время:</span> ${new Date(booking.start).toLocaleTimeString('ru-RU')} - ${new Date(booking.end).toLocaleTimeString('ru-RU')}</p>
-                <p><span class="modal-item-label">Забронировал:</span> ${userName}</p>
+                <p><span class="modal-item-label">Забронировал:</span> ${displayName}</p>
+                <p><span class="modal-item-label">Email:</span> ${userEmail}</p>
                 ${deleteButtonHTML}
             `;
             
@@ -684,15 +717,32 @@
                     updateData.password = newPassword;
                 }
 
-                const { error } = await supabase.auth.updateUser(updateData);
+                const { error: authError } = await supabase.auth.updateUser(updateData);
 
-                if (error) {
-                    showMessage('settingsMessage', 'Ошибка обновления: ' + error.message, 'error');
-                } else {
-                    showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
-                    document.getElementById('newPassword').value = '';
-                    document.getElementById('confirmPassword').value = '';
+                if (authError) {
+                    showMessage('settingsMessage', 'Ошибка обновления: ' + authError.message, 'error');
+                    return;
                 }
+
+                // Обновляем имя пользователя во всех его бронях
+                const { error: bookingsError } = await supabase
+                    .from('bookings')
+                    .update({ user_name: newName })
+                    .eq('user_id', currentUser.id);
+
+                if (bookingsError) {
+                    console.warn('Не удалось обновить имя в бронях:', bookingsError);
+                    // Не показываем ошибку пользователю, так как основное обновление прошло успешно
+                }
+
+                showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                
+                // Перезагружаем брони, чтобы показать обновленное имя
+                loadUserBookings();
+                loadAllBookings();
+
             } catch (err) {
                 showMessage('settingsMessage', 'Произошла ошибка при обновлении настроек', 'error');
             }
