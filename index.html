@@ -557,7 +557,6 @@
             if (error) {
                 showMessage('authMessage', error.message, 'error');
             } else if (data.user) {
-                // Добавляем запись в таблицу profiles после успешной регистрации
                 const { error: profileError } = await supabase
                     .from('profiles')
                     .insert([
@@ -919,15 +918,21 @@
                 }
                 
                 let authUpdateError = null;
+                // Обновление имени пользователя в данных авторизации
+                const { error } = await supabase.auth.updateUser({
+                    data: { user_name: newName }
+                });
+                authUpdateError = error;
+                
                 if (newPassword) {
                     const { error } = await supabase.auth.updateUser({
                         password: newPassword
                     });
-                    authUpdateError = error;
+                    authUpdateError = authUpdateError || error;
                 }
                 
                 if (authUpdateError) {
-                    showMessage('settingsMessage', 'Ошибка обновления пароля: ' + authUpdateError.message, 'error');
+                    showMessage('settingsMessage', 'Ошибка обновления: ' + authUpdateError.message, 'error');
                 } else {
                     showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
                     document.getElementById('newPassword').value = '';
