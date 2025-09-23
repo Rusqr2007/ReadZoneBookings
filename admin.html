@@ -1,28 +1,31 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Админ — ReadZoneBookings</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    :root{--bg:#f6f8fb;--card:#fff;--accent1:#6a11cb;--accent2:#2575fc;--muted:#6b7280;--radius:12px}
-    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);margin:0;padding:28px;color:#111}
-    .wrap{max-width:1100px;margin:0 auto}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
-    .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:0 12px 40px rgba(10,20,30,.06)}
-    h1{margin:0;color:var(--accent1)}
+    :root{--bg:#f6f8fb;--card:#fff;--accent:#2563eb;--danger:#ef4444;--muted:#6b7280;--radius:12px}
+    body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial;padding:20px;color:#111}
+    .wrap{max-width:1200px;margin:0 auto}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.06)}
+    h1{margin:0;color:var(--accent)}
     .muted{color:var(--muted);font-size:13px}
-    .controls{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     input[type="search"], select, input[type="date"], button{padding:10px;border-radius:10px;border:1px solid #e6eef2;font-size:14px}
-    button.primary{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;border:0;cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin-top:14px}
-    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+    button.primary{background:linear-gradient(90deg,var(--accent),#4f46e5);color:white;border:0;cursor:pointer}
+    button.ghost{background:#fff;color:#111;border:1px solid #e6eef2}
+    button.danger{background:var(--danger);color:#fff;border:0;cursor:pointer}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
     th{background:#fafafa;font-weight:600}
     tr:hover{background:#fbfdff}
-    .small{font-size:13px;color:var(--muted)}
     .actions button{margin-right:6px}
-    @media (max-width:900px){ .controls{flex-direction:column;align-items:stretch} .top{flex-direction:column;align-items:flex-start} }
+    .small{font-size:13px;color:var(--muted)}
+    #toast{position:fixed;right:18px;bottom:18px;padding:10px 14px;border-radius:10px;background:#111;color:#fff;display:none}
+    @media (max-width:900px){ .top{flex-direction:column;align-items:flex-start} .controls{flex-direction:column} }
   </style>
 </head>
 <body>
@@ -30,17 +33,17 @@
     <div class="top">
       <div>
         <h1>Админ-панель — ReadZoneBookings</h1>
-        <div class="muted">Управление бронированиями — просматривать может любой, удалять только владелец или админ.</div>
+        <div class="muted">Просмотр: все брони. Удаление: владелец или админ.</div>
       </div>
       <div style="text-align:right">
         <div id="userBlock" class="muted">Загрузка профиля...</div>
-        <div style="margin-top:8px"><button id="refreshBtn">Обновить</button></div>
+        <div style="margin-top:8px"><button id="refreshBtn" class="ghost">Обновить</button></div>
       </div>
     </div>
 
     <div class="card" id="controlsCard">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div style="min-width:220px">
+        <div style="min-width:200px">
           <label class="small">Фильтр по комнате</label><br>
           <select id="roomFilter"><option value="">Все комнаты</option></select>
         </div>
@@ -57,16 +60,23 @@
 
         <div style="display:flex;gap:8px;align-items:flex-end">
           <button id="exportCsv" class="primary">Экспорт CSV</button>
-          <button id="clearFilters">Сброс</button>
+          <button id="clearFilters" class="ghost">Сброс</button>
         </div>
       </div>
 
-      <div style="margin-top:14px" id="stats" class="muted"></div>
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+        <div id="stats" class="small">Загрузка…</div>
+        <div>
+          <button id="deleteSelectedBtn" class="danger" style="display:none">Удалить выбранные</button>
+          <button id="deleteAllBtn" class="danger" style="display:none;margin-left:8px">Удалить ВСЕ (ADMINS)</button>
+        </div>
+      </div>
 
       <div id="tableWrap" style="overflow:auto;margin-top:12px">
         <table id="bookingsTable" aria-live="polite">
           <thead>
             <tr>
+              <th style="width:34px"><input id="checkAll" type="checkbox" aria-label="Выбрать все" /></th>
               <th>ID</th>
               <th>Комната</th>
               <th>Дата</th>
@@ -84,179 +94,189 @@
 
     <div class="card" id="profilesCard">
       <h3 style="margin:0 0 8px">Profiles (видимые записи)</h3>
-      <div class="muted">Если таблица profiles доступна для чтения — здесь будут строки (id, full_name, is_admin).</div>
+      <div class="muted">Если profiles доступны — будут id / full_name / is_admin.</div>
       <div style="margin-top:12px;overflow:auto">
         <table id="profilesTable"><thead><tr><th>ID</th><th>Full name</th><th>is_admin</th></tr></thead><tbody></tbody></table>
       </div>
     </div>
   </div>
 
+  <div id="toast" role="status" aria-live="polite"></div>
+
 <script>
-/* ====== ВСТАВЬ СВОИ ДАННЫЕ (если нужно поменять) ====== */
+/* ============ ПОДСТАВЬ (если нужно) ============ */
 const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
-/* ====================================================== */
+/* ============================================== */
 
 const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let isAdmin = false;
 let bookingsCache = [];
+let selectedIds = new Set();
 
-// helpers
+// UI helpers
 const $ = id => document.getElementById(id);
-function escapeHtml(s){ if (s==null) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg, t=3000){ const el=$('toast'); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',t); }
+function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function formatDate(d){ return d.toLocaleDateString(); }
-function formatTimeRange(s,e){ return `${s.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} — ${e.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`; }
-function csvEscape(v){ if(v==null) return ''; return `"${String(v).replace(/"/g,'""')}"`; }
-function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+function formatTimeRange(s,e){ return `${s.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} — ${e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`; }
+function debounce(fn,ms){ let t; return(...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 
-// init
+// Initialization
 async function initAdmin(){
   // get current user
   const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) { alert('Сначала войдите в систему.'); location.href = '/'; return; }
+  if (error || !user) { alert('Сначала войдите'); location.href='/'; return; }
   currentUser = user;
   $('userBlock').textContent = `${user.email} · id: ${user.id}`;
 
-  // read is_admin from profiles (RLS must allow read)
+  // check admin flag from profiles
   try {
-    const { data: profile, error: profErr } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
-    if (profErr) { console.warn('Profile fetch error (RLS?)', profErr.message); isAdmin = false; }
-    else { isAdmin = profile?.is_admin === true; }
-  } catch(e){ console.error(e); isAdmin = false; }
+    const { data: profile, error: profErr } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    if (profErr) { console.warn('profile fetch err', profErr.message); isAdmin=false; } else { isAdmin = profile?.is_admin === true; }
+  } catch(e){ console.error(e); isAdmin=false; }
+
+  // show admin controls
+  if (isAdmin){ $('deleteAllBtn').style.display='inline-block'; $('deleteSelectedBtn').style.display='inline-block'; }
 
   // wire UI
   $('refreshBtn').addEventListener('click', loadAndRender);
-  $('clearFilters').addEventListener('click', () => { $('roomFilter').value=''; $('dateFilter').value=''; $('q').value=''; loadAndRender(); });
+  $('clearFilters').addEventListener('click', ()=>{ $('roomFilter').value=''; $('dateFilter').value=''; $('q').value=''; loadAndRender(); });
   $('q').addEventListener('input', debounce(loadAndRender, 300));
   $('roomFilter').addEventListener('change', loadAndRender);
   $('dateFilter').addEventListener('change', loadAndRender);
   $('exportCsv').addEventListener('click', exportCSV);
+  $('deleteAllBtn').addEventListener('click', deleteAllBookingsConfirm);
+  $('deleteSelectedBtn').addEventListener('click', deleteSelectedConfirm);
+  $('checkAll').addEventListener('change', onToggleAll);
 
   // realtime
   supabase.channel('realtime-bookings')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
-      loadAndRender();
-    }).subscribe();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => loadAndRender())
+    .subscribe();
 
-  // initial load
+  // initial
   await loadAndRender();
   await loadProfiles();
 }
 
-// load bookings
+// Load bookings
 async function loadBookings(){
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('id, room, start, end, user_email, user_id')
-    .order('start', { ascending: true });
-
-  if (error) { console.error('loadBookings error', error); bookingsCache = []; return; }
-  bookingsCache = (data || []).map(b => ({ ...b, start: new Date(b.start), end: new Date(b.end) }));
+  const { data, error } = await supabase.from('bookings').select('id, room, start, end, user_email, user_id, created_at').order('start',{ascending:true});
+  if (error){ console.error('loadBookings error', error); bookingsCache=[]; return; }
+  bookingsCache = (data||[]).map(b=>({...b, start:new Date(b.start), end:new Date(b.end)}));
 }
 
-// render
+// Render
 async function loadAndRender(){
-  $('stats').textContent = 'Загрузка...';
+  $('stats').textContent='Загрузка...';
   await loadBookings();
   populateRoomFilter();
   renderBookings();
-  $('stats').textContent = `Всего броней: ${bookingsCache.length} · ${isAdmin ? 'Вы: админ' : 'Вы: обычный пользователь'}`;
+  $('stats').textContent = `Всего броней: ${bookingsCache.length} · ${isAdmin ? 'Вы: админ' : 'Вы: пользователь'}`;
 }
 
 function populateRoomFilter(){
   const rooms = Array.from(new Set(bookingsCache.map(b=>b.room).filter(Boolean)));
-  const sel = $('roomFilter');
-  const cur = sel.value || '';
-  sel.innerHTML = '<option value="">Все комнаты</option>';
-  rooms.forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = r; opt.textContent = r;
-    if (r === cur) opt.selected = true;
-    sel.appendChild(opt);
-  });
+  const sel=$('roomFilter'), cur=sel.value||''; sel.innerHTML='<option value="">Все комнаты</option>';
+  rooms.forEach(r=>{ const opt=document.createElement('option'); opt.value=r; opt.textContent=r; if(r===cur) opt.selected=true; sel.appendChild(opt); });
 }
 
 function renderBookings(){
-  const tbody = document.querySelector('#bookingsTable tbody');
-  tbody.innerHTML = '';
-  const q = $('q').value.trim().toLowerCase();
-  const roomFilter = $('roomFilter').value;
-  const dateFilter = $('dateFilter').value;
-
+  const tbody = document.querySelector('#bookingsTable tbody'); tbody.innerHTML='';
+  const q = $('q').value.trim().toLowerCase(), roomFilter=$('roomFilter').value, dateFilter=$('dateFilter').value;
   let list = bookingsCache.slice();
-  if (roomFilter) list = list.filter(b => b.room === roomFilter);
-  if (dateFilter) list = list.filter(b => b.start.toISOString().slice(0,10) === dateFilter);
-  if (q) list = list.filter(b => ((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
-
-  if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="muted">Броней не найдено по фильтрам.</td></tr>`;
-    return;
-  }
-
-  list.forEach(b => {
-    const canDelete = (currentUser && (String(currentUser.id) === String(b.user_id) || isAdmin));
-    const deleteBtn = canDelete ? `<button onclick="confirmDelete('${b.id}')">Удалить</button>` : '';
-    const row = `<tr>
-      <td style="min-width:200px">${escapeHtml(b.id)}</td>
-      <td>${escapeHtml(b.room)}</td>
-      <td>${formatDate(b.start)}</td>
-      <td>${formatTimeRange(b.start,b.end)}</td>
-      <td>${escapeHtml(b.user_email || b.user_id || '—')}</td>
-      <td class="actions">${deleteBtn}</td>
-    </tr>`;
-    tbody.insertAdjacentHTML('beforeend', row);
+  if (roomFilter) list=list.filter(b=>b.room===roomFilter);
+  if (dateFilter) list=list.filter(b=>b.start.toISOString().slice(0,10)===dateFilter);
+  if (q) list=list.filter(b=>((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
+  if (!list.length){ tbody.innerHTML=`<tr><td colspan="7" class="muted">Броней не найдено по фильтрам.</td></tr>`; return; }
+  list.forEach(b=>{
+    const canDelete = currentUser && (String(currentUser.id) === String(b.user_id) || isAdmin);
+    const deleteBtn = canDelete ? `<button class="ghost" onclick="confirmDelete('${b.id}')">Удалить</button>` : '';
+    const checked = selectedIds.has(b.id) ? 'checked' : '';
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td><input type="checkbox" data-id="${b.id}" onchange="onToggle(this)" ${checked} /></td>
+        <td style="min-width:200px">${escapeHtml(b.id)}</td>
+        <td>${escapeHtml(b.room)}</td>
+        <td>${formatDate(b.start)}</td>
+        <td>${formatTimeRange(b.start,b.end)}</td>
+        <td>${escapeHtml(b.user_email || b.user_id || '—')}</td>
+        <td class="actions">${deleteBtn}</td>
+      </tr>
+    `);
   });
 }
 
-// delete
-function confirmDelete(id){
-  if (!confirm('Удалить бронь?')) return;
-  deleteBooking(id);
-}
+// Selection handlers
+function onToggle(box){ const id=box.dataset.id; if(box.checked) selectedIds.add(id); else selectedIds.delete(id); $('checkAll').checked = document.querySelectorAll('#bookingsTable tbody input[type=checkbox]').length === document.querySelectorAll('#bookingsTable tbody input[type=checkbox]:checked').length; }
+function onToggleAll(){ const all=$('checkAll').checked; document.querySelectorAll('#bookingsTable tbody input[type=checkbox]').forEach(cb=>{ cb.checked=all; const id=cb.dataset.id; if(all) selectedIds.add(id); else selectedIds.delete(id); }); }
+
+// Single delete
+function confirmDelete(id){ if(!confirm('Удалить эту бронь? Это окончательно.')) return; deleteBooking(id); }
 async function deleteBooking(id){
   try{
-    const { error, data } = await supabase.from('bookings').delete().eq('id', id);
+    const { error } = await supabase.from('bookings').delete().eq('id', id);
     if (error) throw error;
+    toast('Бронь удалена');
+    selectedIds.delete(id);
     await loadAndRender();
-    alert('Бронь удалена');
-  } catch(err){
-    console.error('delete error', err);
-    alert('Не удалось удалить: ' + (err.message || JSON.stringify(err)));
-  }
+  }catch(err){ console.error('delete error', err); alert('Не удалось удалить: ' + (err.message || JSON.stringify(err))); }
 }
 
-// export CSV
+// Delete selected
+function deleteSelectedConfirm(){ if(selectedIds.size===0){ alert('Нет выбранных записей'); return; } if(!confirm(`Удалить ${selectedIds.size} выбранных броней? Это необратимо.`)) return; deleteSelected(); }
+async function deleteSelected(){
+  const ids = Array.from(selectedIds);
+  try{
+    const { error } = await supabase.from('bookings').delete().in('id', ids);
+    if (error) throw error;
+    toast(`Удалено ${ids.length}`);
+    selectedIds.clear(); $('checkAll').checked=false;
+    await loadAndRender();
+  }catch(err){ console.error('deleteSelected error', err); alert('Ошибка при удалении: ' + (err.message || JSON.stringify(err))); }
+}
+
+// Delete all (admin only)
+function deleteAllBookingsConfirm(){ if(!isAdmin){ alert('Только админ может удалять все брони.'); return; } const a = prompt('Напишите CONFIRM чтобы удалить все брони окончательно:'); if(a!=='CONFIRM'){ alert('Отменено. Для удаления введите CONFIRM'); return; } if(!confirm('Ещё раз: удалить ВСЕ брони окончательно?')) return; deleteAllBookings(); }
+async function deleteAllBookings(){
+  try{
+    const { error } = await supabase.from('bookings').delete().neq('id',''); // удалит все строки
+    if (error) throw error;
+    toast('Все брони удалены');
+    selectedIds.clear(); $('checkAll').checked=false;
+    await loadAndRender();
+  }catch(err){ console.error('deleteAll error', err); alert('Ошибка удаления всех бронир: ' + (err.message || JSON.stringify(err))); }
+}
+
+// Export CSV
 function exportCSV(){
   let list = bookingsCache.slice();
   const q = $('q').value.trim().toLowerCase();
   const roomFilter = $('roomFilter').value;
   const dateFilter = $('dateFilter').value;
-  if (roomFilter) list = list.filter(b => b.room === roomFilter);
-  if (dateFilter) list = list.filter(b => b.start.toISOString().slice(0,10) === dateFilter);
-  if (q) list = list.filter(b => ((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
-
-  if (!list.length) { alert('Нечего экспортировать'); return; }
-  const header = ['id','room','date','start','end','user_email','user_id'];
-  const rows = [ header.join(',') ];
-  list.forEach(r => rows.push([r.id, r.room, r.start.toISOString().slice(0,10), r.start.toISOString(), r.end.toISOString(), r.user_email||'', r.user_id||''].map(csvEscape).join(',')));
-  const csv = rows.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'bookings_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  if (roomFilter) list = list.filter(b=>b.room===roomFilter);
+  if (dateFilter) list = list.filter(b=>b.start.toISOString().slice(0,10)===dateFilter);
+  if (q) list = list.filter(b=>((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
+  if (!list.length){ alert('Нечего экспортировать'); return; }
+  const header=['id','room','date','start','end','user_email','user_id'];
+  const rows=[header.join(',')];
+  list.forEach(r=> rows.push([r.id,r.room,r.start.toISOString().slice(0,10),r.start.toISOString(),r.end.toISOString(),r.user_email||'',r.user_id||''].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')));
+  const csv=rows.join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='bookings_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-// load profiles (optional)
+// Load profiles
 async function loadProfiles(){
   try{
-    const { data, error } = await supabase.from('profiles').select('id, full_name, is_admin').order('created_at', { ascending: true });
-    if (error) { console.warn('profiles not readable', error.message); document.querySelector('#profilesTable tbody').innerHTML = `<tr><td colspan="3" class="muted">Profiles недоступны (RLS).</td></tr>`; return; }
-    const tbody = document.querySelector('#profilesTable tbody'); tbody.innerHTML = '';
-    data.forEach(p => tbody.insertAdjacentHTML('beforeend', `<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.full_name)}</td><td>${p.is_admin ? 'yes' : 'no'}</td></tr>`));
-  }catch(e){ console.error(e); document.querySelector('#profilesTable tbody').innerHTML = `<tr><td colspan="3" class="muted">Ошибка загрузки profiles</td></tr>`; }
+    const { data, error } = await supabase.from('profiles').select('id, full_name, is_admin').order('created_at',{ascending:true});
+    const tbody = document.querySelector('#profilesTable tbody'); tbody.innerHTML='';
+    if (error){ console.warn('profiles not readable', error.message); tbody.innerHTML=`<tr><td colspan="3" class="muted">Profiles недоступны (RLS).</td></tr>`; return; }
+    data.forEach(p=> tbody.insertAdjacentHTML('beforeend', `<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.full_name)}</td><td>${p.is_admin? 'yes':'no'}</td></tr>`));
+  }catch(e){ console.error(e); document.querySelector('#profilesTable tbody').innerHTML=`<tr><td colspan="3" class="muted">Ошибка загрузки profiles</td></tr>`; }
 }
 
-// start
 initAdmin();
 </script>
 </body>
