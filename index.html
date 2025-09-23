@@ -10,6 +10,8 @@
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
         .container{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-radius:20px;padding:40px;box-shadow:0 20px 40px rgba(0,0,0,.1);width:100%;max-width:650px;text-align:center}
         h1{color:#333;margin-bottom:10px;font-size:2rem;font-weight:600}.subtitle{color:#666;margin-bottom:30px;font-size:.9rem}.form-group{margin-bottom:20px;text-align:left}label{display:block;margin-bottom:8px;color:#555;font-weight:500;font-size:.9rem}input,select,textarea{width:100%;padding:12px;border:2px solid #e1e5e9;border-radius:12px;font-size:16px;background:white}.date-time-group{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;margin-top:10px}.btn-secondary{background:#6c757d}.auth-card,.booking-card,.password-reset-card,.settings-card{display:none}.auth-card.active,.booking-card.active,.password-reset-card.active,.settings-card.active{display:block}.bookings-list{margin-top:20px;text-align:left}.booking-item{background:#f8f9fa;padding:12px;border-radius:10px;margin-bottom:10px;border-left:4px solid #667eea;cursor:pointer}.booking-time{font-weight:600;color:#333}.booking-duration{color:#666;font-size:.9rem}.booking-comment{font-size:.9rem;color:#444;margin-top:5px;font-style:italic;white-space:pre-wrap}.error{color:#dc3545;font-size:.9rem;margin-top:5px}.success{color:#28a745;font-size:.9rem;margin-top:5px}.room-info{background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:16px;border-radius:12px;margin-bottom:20px;text-align:left}.room-title{font-size:1.1rem;font-weight:600;color:#333;margin-bottom:4px}.info-text{color:#555;font-size:.9rem;margin-top:-8px;margin-bottom:16px;text-align:left}.modal{display:none;position:fixed;z-index:1;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);justify-content:center;align-items:center}.modal-content{background:#fff;padding:16px;border-radius:10px;width:90%;max-width:420px;position:relative}.close-btn{position:absolute;right:12px;top:6px;font-size:22px;cursor:pointer}.checkbox-container{display:block;position:relative;padding-left:35px;margin-bottom:10px;cursor:pointer;font-size:.9rem;color:#555;text-align:left}.checkbox-container input{position:absolute;opacity:0;cursor:pointer;height:0;width:0}.checkmark{position:absolute;left:0;top:0;height:22px;width:22px;background:#eee;border-radius:6px}.checkbox-container input:checked ~ .checkmark{background:#667eea}.checkmark:after{content:"";position:absolute;display:none}.checkbox-container input:checked ~ .checkmark:after{display:block}.checkbox-container .checkmark:after{left:8px;top:4px;width:6px;height:12px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}
+        .privacy-options {display:flex;gap:15px;margin:10px 0}.privacy-option label{display:flex;align-items:center;gap:5px;cursor:pointer}.privacy-option input[type="radio"]{width:auto}.privacy-badge{font-size:0.7rem;padding:2px 6px;border-radius:10px;margin-left:5px;background:#667eea;color:white}
+        .modal-delete-btn{background:#dc3545;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:10px}
     </style>
 </head>
 <body>
@@ -41,7 +43,7 @@
       <div class="form-group"><label for="settingsEmail">Email</label><input type="email" id="settingsEmail" disabled><small>Email нельзя изменить</small></div>
       <div class="form-group"><label for="newPassword">Новый пароль</label><input type="password" id="newPassword"></div>
       <div class="form-group"><label for="confirmPassword">Подтвердите пароль</label><input type="password" id="confirmPassword"></div>
-      <label class="checkbox-container">Скрыть мою почту в списке броней<input type="checkbox" id="hideProfileCheckbox"><span class="checkmark"></span></label>
+      <label class="checkbox-container">Скрыть мою почту в списке броней по умолчанию<input type="checkbox" id="hideProfileCheckbox"><span class="checkmark"></span></label>
       <button class="btn" id="btnSaveSettings">Сохранить</button>
       <button class="btn btn-secondary" id="btnBackToBooking">Назад</button>
       <div id="settingsMessage"></div>
@@ -56,6 +58,24 @@
       <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
 
       <div class="form-group"><label for="bookingComment">Комментарий</label><textarea id="bookingComment" rows="3" placeholder="Цель бронирования"></textarea></div>
+      
+      <div class="form-group">
+        <label>Видимость брони для других:</label>
+        <div class="privacy-options">
+          <div class="privacy-option">
+            <input type="radio" id="privacy-public" name="privacy" value="public" checked>
+            <label for="privacy-public">Показывать имя</label>
+          </div>
+          <div class="privacy-option">
+            <input type="radio" id="privacy-email" name="privacy" value="email">
+            <label for="privacy-email">Показывать email</label>
+          </div>
+          <div class="privacy-option">
+            <input type="radio" id="privacy-anonymous" name="privacy" value="anonymous">
+            <label for="privacy-anonymous">Анонимно</label>
+          </div>
+        </div>
+      </div>
 
       <button class="btn" id="btnCreateBooking">Забронировать</button>
       <button class="btn btn-secondary" id="btnSignOut">Выйти</button>
@@ -180,9 +200,26 @@
   async function signOut(){ await supabase.auth.signOut(); currentUser = null; showAuth(); if(realtimeChannel){ supabase.removeChannel(realtimeChannel); realtimeChannel = null; } }
 
   // --- PROFILE / SETTINGS ---
-  async function loadUserSettings(){ if(!currentUser) return; const { data: profile } = await supabase.from('profiles').select('user_name,is_public').eq('id', currentUser.id).maybeSingle(); el('settingsName').value = profile?.user_name || currentUser.user_metadata?.user_name || ''; el('settingsEmail').value = currentUser.email || ''; el('hideProfileCheckbox').checked = !(profile?.is_public ?? true); el('newPassword').value = ''; el('confirmPassword').value = ''; }
+  async function loadUserSettings(){ 
+    if(!currentUser) return; 
+    const { data: profile } = await supabase.from('profiles').select('user_name,is_public').eq('id', currentUser.id).maybeSingle(); 
+    el('settingsName').value = profile?.user_name || currentUser.user_metadata?.user_name || ''; 
+    el('settingsEmail').value = currentUser.email || ''; 
+    el('hideProfileCheckbox').checked = !(profile?.is_public ?? true); 
+    el('newPassword').value = ''; 
+    el('confirmPassword').value = ''; 
+  }
 
-  async function updateProfile(){ if(!currentUser) return; const newName = el('settingsName').value.trim(); const newPassword = el('newPassword').value; const confirmPassword = el('confirmPassword').value; const isPublic = !el('hideProfileCheckbox').checked; if(!newName){ showMessage('settingsMessage','Имя не может быть пустым'); return; } if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } if(newPassword && newPassword.length < 6){ showMessage('settingsMessage','Пароль должен быть минимум 6 символов'); return; }
+  async function updateProfile(){ 
+    if(!currentUser) return; 
+    const newName = el('settingsName').value.trim(); 
+    const newPassword = el('newPassword').value; 
+    const confirmPassword = el('confirmPassword').value; 
+    const isPublic = !el('hideProfileCheckbox').checked; 
+    
+    if(!newName){ showMessage('settingsMessage','Имя не может быть пустым'); return; } 
+    if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } 
+    if(newPassword && newPassword.length < 6){ showMessage('settingsMessage','Пароль должен быть минимум 6 символов'); return; }
 
     const { error: pErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: newName, is_public: isPublic }], { onConflict: 'id' });
     if(pErr){ showMessage('settingsMessage','Ошибка обновления профиля: ' + pErr.message); return; }
@@ -194,48 +231,206 @@
   }
 
   // --- BOOKINGS: create/read/delete ---
-  async function createBooking(){ if(!currentUser){ showMessage('bookingMessage','Войдите в систему'); return; }
+  async function createBooking(){ 
+    if(!currentUser){ showMessage('bookingMessage','Войдите в систему'); return; }
 
-    const date = el('bookingDate').value; const timeStart = el('time-start').value; const timeEnd = el('time-end').value; const comment = el('bookingComment').value.trim(); if(!date || !timeStart || !timeEnd){ showMessage('bookingMessage','Заполните все поля'); return; }
+    const date = el('bookingDate').value; 
+    const timeStart = el('time-start').value; 
+    const timeEnd = el('time-end').value; 
+    const comment = el('bookingComment').value.trim(); 
+    const privacySetting = document.querySelector('input[name="privacy"]:checked').value;
+    
+    if(!date || !timeStart || !timeEnd){ showMessage('bookingMessage','Заполните все поля'); return; }
 
-    let start = new Date(date + 'T' + timeStart); let end = new Date(date + 'T' + timeEnd); if(end <= start){ end.setDate(end.getDate() + 1); }
-    const durationMs = end - start; const maxMs = 4 * 60 * 60 * 1000; if(durationMs <= 0){ showMessage('bookingMessage','Неверное время'); return; } if(durationMs > maxMs){ showMessage('bookingMessage','Максимум 4 часа'); return; }
+    let start = new Date(date + 'T' + timeStart); 
+    let end = new Date(date + 'T' + timeEnd); 
+    if(end <= start){ end.setDate(end.getDate() + 1); }
+    
+    const durationMs = end - start; 
+    const maxMs = 4 * 60 * 60 * 1000; 
+    if(durationMs <= 0){ showMessage('bookingMessage','Неверное время'); return; } 
+    if(durationMs > maxMs){ showMessage('bookingMessage','Максимум 4 часа'); return; }
 
-    const available = await checkTimeAvailability(start.toISOString(), end.toISOString()); if(!available){ showMessage('bookingMessage','В это время уже есть бронь. Выберите другое время.'); return; }
+    const available = await checkTimeAvailability(start.toISOString(), end.toISOString()); 
+    if(!available){ showMessage('bookingMessage','В это время уже есть бронь. Выберите другое время.'); return; }
 
     // upsert profile before insert to avoid FK error
-    const safeName = currentUser.user_metadata?.user_name || null; const safeEmail = currentUser.email || null;
+    const safeName = currentUser.user_metadata?.user_name || null; 
+    const safeEmail = currentUser.email || null;
     const { error: upsertErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: safeName, email: safeEmail }], { onConflict: 'id' });
     if(upsertErr){ console.error('profile upsert error before booking', upsertErr); showMessage('bookingMessage','Ошибка профиля: ' + upsertErr.message, 'error'); return; }
 
-    const { error } = await supabase.from('bookings').insert([{ user_id: currentUser.id, start: start.toISOString(), end: end.toISOString(), room: 'Читальный зал', comment }]);
+    const { error } = await supabase.from('bookings').insert([{ 
+      user_id: currentUser.id, 
+      start: start.toISOString(), 
+      end: end.toISOString(), 
+      room: 'Читальный зал', 
+      comment,
+      privacy_setting: privacySetting // сохраняем настройку приватности для этой брони
+    }]);
+    
     if(error){ showMessage('bookingMessage','Ошибка при создании: ' + error.message, 'error'); console.error(error); return; }
 
-    showMessage('bookingMessage','Бронь создана','success'); await loadUserBookings(); await loadAllBookings(); }
+    showMessage('bookingMessage','Бронь создана','success'); 
+    await loadUserBookings(); 
+    await loadAllBookings(); 
+  }
 
-  async function checkTimeAvailability(startIso, endIso){ const { data, error } = await supabase.from('bookings').select('id,start,end').or(`and(start.lt.${endIso},end.gt.${startIso})`); if(error){ console.error('check availability error', error); return false; } return !data || data.length === 0; }
+  async function checkTimeAvailability(startIso, endIso){ 
+    const { data, error } = await supabase.from('bookings').select('id,start,end').or(`and(start.lt.${endIso},end.gt.${startIso})`); 
+    if(error){ console.error('check availability error', error); return false; } 
+    return !data || data.length === 0; 
+  }
 
-  async function loadUserBookings(){ if(!currentUser) return; const { data, error } = await supabase.from('bookings').select('*').eq('user_id', currentUser.id).order('start', { ascending: true }); const node = el('bookingsList'); if(error || !data || data.length === 0){ node.innerHTML = '<p>У вас пока нет броней</p>'; return; } node.innerHTML = data.map(b => bookingItemHtml(b)).join(''); attachClickListeners(data); }
+  async function loadUserBookings(){ 
+    if(!currentUser) return; 
+    const { data, error } = await supabase.from('bookings').select('*').eq('user_id', currentUser.id).order('start', { ascending: true }); 
+    const node = el('bookingsList'); 
+    if(error || !data || data.length === 0){ node.innerHTML = '<p>У вас пока нет броней</p>'; return; } 
+    node.innerHTML = data.map(b => bookingItemHtml(b, false, true)).join(''); 
+    attachClickListeners(data); 
+  }
 
-  async function loadAllBookings(){ const { data, error } = await supabase.from('bookings_with_profile').select('*').order('start', { ascending: true }); const node = el('allBookingsList'); if(error || !data || data.length === 0){ node.innerHTML = '<p>Броней пока нет</p>'; return; } node.innerHTML = data.map(b => bookingItemHtml(b, true)).join(''); attachClickListeners(data); }
+  async function loadAllBookings(){ 
+    const { data, error } = await supabase.from('bookings_with_profile').select('*').order('start', { ascending: true }); 
+    const node = el('allBookingsList'); 
+    if(error || !data || data.length === 0){ node.innerHTML = '<p>Броней пока нет</p>'; return; } 
+    node.innerHTML = data.map(b => bookingItemHtml(b, true)).join(''); 
+    attachClickListeners(data); 
+  }
 
-  function bookingItemHtml(b, showName=true){ const name = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним'; const start = new Date(b.start); const end = new Date(b.end); const sameDay = start.toLocaleDateString('ru-RU') === end.toLocaleDateString('ru-RU'); const dateDisplay = sameDay ? `${start.toLocaleDateString('ru-RU')} c ${start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} до ${end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}` : `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; const title = showName ? `${escapeHtml(name)} — ${escapeHtml(b.room || 'Читальный зал')}` : `${escapeHtml(b.room || 'Читальный зал')}`; return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div>${commentHtml}</div>`; }
+  function bookingItemHtml(b, showName=true, isOwnBooking=false){ 
+    // Для своих броней всегда показываем полную информацию
+    if (isOwnBooking) {
+      const name = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним';
+      const start = new Date(b.start); 
+      const end = new Date(b.end); 
+      const sameDay = start.toLocaleDateString('ru-RU') === end.toLocaleDateString('ru-RU'); 
+      const dateDisplay = sameDay ? 
+        `${start.toLocaleDateString('ru-RU')} c ${start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} до ${end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}` : 
+        `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
+      const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; 
+      const title = `${escapeHtml(b.room || 'Читальный зал')}`;
+      const privacyBadge = b.privacy_setting ? `<span class="privacy-badge">${getPrivacyLabel(b.privacy_setting)}</span>` : '';
+      return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title} ${privacyBadge}</div><div class="booking-duration">${dateDisplay}</div><div><strong>Ваша бронь</strong></div>${commentHtml}</div>`;
+    }
+    
+    // Для чужих броней учитываем настройки приватности
+    let displayName = 'Аноним';
+    const privacySetting = b.privacy_setting || 'public';
+    
+    if (privacySetting === 'email' && b.profile_email) {
+      displayName = b.profile_email;
+    } else if (privacySetting === 'public') {
+      displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || 'Аноним';
+    }
+    
+    const start = new Date(b.start); 
+    const end = new Date(b.end); 
+    const sameDay = start.toLocaleDateString('ru-RU') === end.toLocaleDateString('ru-RU'); 
+    const dateDisplay = sameDay ? 
+      `${start.toLocaleDateString('ru-RU')} c ${start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} до ${end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}` : 
+      `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
+    const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; 
+    const title = showName ? `${escapeHtml(displayName)} — ${escapeHtml(b.room || 'Читальный зал')}` : `${escapeHtml(b.room || 'Читальный зал')}`; 
+    const privacyBadge = privacySetting !== 'public' ? `<span class="privacy-badge">${getPrivacyLabel(privacySetting)}</span>` : '';
+    return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title} ${privacyBadge}</div><div class="booking-duration">${dateDisplay}</div>${commentHtml}</div>`; 
+  }
 
-  function attachClickListeners(bookings){ document.querySelectorAll('.booking-item').forEach(item => { item.onclick = () => { const id = item.getAttribute('data-id'); const b = bookings.find(x => x.id === id); if(b) showBookingDetails(b); }; }); }
+  function getPrivacyLabel(setting) {
+    switch(setting) {
+      case 'public': return 'Имя';
+      case 'email': return 'Email';
+      case 'anonymous': return 'Аноним';
+      default: return 'Имя';
+    }
+  }
+
+  function attachClickListeners(bookings){ 
+    document.querySelectorAll('.booking-item').forEach(item => { 
+      item.onclick = () => { 
+        const id = item.getAttribute('data-id'); 
+        const b = bookings.find(x => x.id === id); 
+        if(b) showBookingDetails(b); 
+      }; 
+    }); 
+  }
 
   function escapeHtml(s){ return String(s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  async function showBookingDetails(b){ const modal = el('bookingModal'), info = el('modalInfo'); const start = new Date(b.start), end = new Date(b.end); const name = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним'; const dateDisplay = (start.toLocaleDateString('ru-RU')===end.toLocaleDateString('ru-RU')) ? `${start.toLocaleDateString('ru-RU')} с ${start.toLocaleTimeString('ru-RU')} до ${end.toLocaleTimeString('ru-RU')}` : `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; const commentHtml = b.comment ? `<p><strong>Комментарий:</strong> ${escapeHtml(b.comment)}</p>` : ''; const deleteBtn = (currentUser && b.user_id === currentUser.id) ? `<button class="modal-delete-btn" onclick="confirmDelete('${b.id}')">Удалить</button>` : ''; info.innerHTML = `<h3>Детали брони</h3><p><strong>Комната:</strong> ${escapeHtml(b.room||'Читальный зал')}</p><p><strong>Время:</strong> ${dateDisplay}</p><p><strong>Забронировал:</strong> ${escapeHtml(name)}</p>${commentHtml}${deleteBtn}`; modal.style.display='flex'; }
+  async function showBookingDetails(b){ 
+    const modal = el('bookingModal'), info = el('modalInfo'); 
+    const start = new Date(b.start), end = new Date(b.end); 
+    
+    // Определяем, наша ли это бронь
+    const isOwnBooking = currentUser && b.user_id === currentUser.id;
+    
+    let displayName = 'Аноним';
+    if (isOwnBooking) {
+      displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним';
+    } else {
+      const privacySetting = b.privacy_setting || 'public';
+      if (privacySetting === 'email' && b.profile_email) {
+        displayName = b.profile_email;
+      } else if (privacySetting === 'public') {
+        displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || 'Аноним';
+      }
+    }
+    
+    const dateDisplay = (start.toLocaleDateString('ru-RU')===end.toLocaleDateString('ru-RU')) ? 
+      `${start.toLocaleDateString('ru-RU')} с ${start.toLocaleTimeString('ru-RU')} до ${end.toLocaleTimeString('ru-RU')}` : 
+      `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
+    const commentHtml = b.comment ? `<p><strong>Комментарий:</strong> ${escapeHtml(b.comment)}</p>` : ''; 
+    const privacyInfo = isOwnBooking ? `<p><strong>Видимость:</strong> ${getPrivacyLabel(b.privacy_setting || 'public')}</p>` : '';
+    const deleteBtn = isOwnBooking ? `<button class="modal-delete-btn" onclick="confirmDelete('${b.id}')">Удалить</button>` : ''; 
+    
+    info.innerHTML = `
+      <h3>Детали брони</h3>
+      <p><strong>Комната:</strong> ${escapeHtml(b.room||'Читальный зал')}</p>
+      <p><strong>Время:</strong> ${dateDisplay}</p>
+      <p><strong>Забронировал:</strong> ${escapeHtml(displayName)}</p>
+      ${privacyInfo}
+      ${commentHtml}
+      ${deleteBtn}
+    `; 
+    modal.style.display='flex'; 
+  }
 
   function confirmDelete(id){ if(confirm('Удалить бронь?')) deleteBooking(id); }
 
-  async function deleteBooking(id){ if(!currentUser){ alert('Нужен вход'); return; } const { error } = await supabase.from('bookings').delete().eq('id', id).eq('user_id', currentUser.id); if(error) alert('Ошибка: ' + error.message); else { alert('Удалено'); el('bookingModal').style.display='none'; await loadUserBookings(); await loadAllBookings(); } }
+  async function deleteBooking(id){ 
+    if(!currentUser){ alert('Нужен вход'); return; } 
+    const { error } = await supabase.from('bookings').delete().eq('id', id).eq('user_id', currentUser.id); 
+    if(error) alert('Ошибка: ' + error.message); 
+    else { alert('Удалено'); el('bookingModal').style.display='none'; await loadUserBookings(); await loadAllBookings(); } 
+  }
 
   // --- realtime ---
-  function subscribeRealtime(){ if(realtimeChannel) return; realtimeChannel = supabase.channel('realtime:bookings-profiles').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, payload => { console.log('profiles change', payload); loadAllBookings(); loadUserBookings(); }).on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => { console.log('bookings change', payload); loadAllBookings(); loadUserBookings(); }).subscribe(); }
+  function subscribeRealtime(){ 
+    if(realtimeChannel) return; 
+    realtimeChannel = supabase.channel('realtime:bookings-profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, payload => { 
+        console.log('profiles change', payload); 
+        loadAllBookings(); 
+        loadUserBookings(); 
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => { 
+        console.log('bookings change', payload); 
+        loadAllBookings(); 
+        loadUserBookings(); 
+      })
+      .subscribe(); 
+  }
 
   // очистка старых броней (опционально)
-  async function cleanupOldBookings(){ try { const now = new Date(); const cutoff = new Date(now.getTime() - 24*60*60*1000).toISOString(); const { error } = await supabase.from('bookings').delete().lt('end', cutoff); if(error) console.error('cleanup error', error); } catch(e){ console.error(e); } }
+  async function cleanupOldBookings(){ 
+    try { 
+      const now = new Date(); 
+      const cutoff = new Date(now.getTime() - 24*60*60*1000).toISOString(); 
+      const { error } = await supabase.from('bookings').delete().lt('end', cutoff); 
+      if(error) console.error('cleanup error', error); 
+    } catch(e){ console.error(e); } 
+  }
 
   (async ()=>{ await cleanupOldBookings(); })();
 
