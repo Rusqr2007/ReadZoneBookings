@@ -1,383 +1,4 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReadZone - Бронирование читального зала</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 450px;
-            text-align: center;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2rem;
-            font-weight: 600;
-        }
-
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 0.9rem;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e1e5e9;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: white;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        input:disabled {
-            background-color: #f5f5f5;
-            color: #999;
-        }
-        
-        .date-time-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            margin-top: 10px;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            margin-top: 10px;
-        }
-
-        .auth-card, .booking-card, .password-reset-card, .settings-card {
-            display: none;
-        }
-
-        .auth-card.active, .booking-card.active, .password-reset-card.active, .settings-card.active {
-            display: block;
-        }
-
-        .bookings-list {
-            margin-top: 20px;
-            text-align: left;
-        }
-
-        .booking-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            border-left: 4px solid #667eea;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .booking-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-
-        .booking-time {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .booking-duration {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .error {
-            color: #dc3545;
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-
-        .success {
-            color: #28a745;
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-
-        .room-info {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-        }
-
-        .room-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 5px;
-        }
-
-        .room-desc {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .info-text {
-            color: #555;
-            font-size: 0.9rem;
-            margin-top: -10px;
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        small {
-            color: #666;
-            font-size: 0.8rem;
-        }
-        
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            width: 80%;
-            max-width: 400px;
-            position: relative;
-        }
-
-        .close-btn {
-            color: #aaa;
-            position: absolute;
-            right: 15px;
-            top: 10px;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close-btn:hover {
-            color: #333;
-        }
-
-        .modal-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-
-        .modal-delete-btn {
-            width: 100%;
-            padding: 10px;
-            background: none;
-            border: 1px solid #dc3545;
-            color: #dc3545;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .modal-delete-btn:hover {
-            background-color: #dc3545;
-            color: white;
-        }
-        
-        .modal-item-label {
-            font-weight: 500;
-            color: #555;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>ReadZoneBookings</h1>
-        <p class="subtitle">Бронирование читального зала</p>
-
-        <div class="auth-card active" id="authCard">
-            <div class="form-group">
-                <label for="name">Ваше имя</label>
-                <input type="text" id="name" placeholder="Нуралы Нурали" required>
-            </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" placeholder="your@email.com" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Пароль</label>
-                <input type="password" id="password" placeholder="Минимум 6 символов" required>
-            </div>
-            <button class="btn" onclick="signIn()">Войти</button>
-            <button class="btn btn-secondary" onclick="signUp()">Зарегистрироваться</button>
-            <button class="btn btn-secondary" onclick="showPasswordReset()">Сброс пароля</button>
-            <div id="authMessage"></div>
-        </div>
-
-        <div class="password-reset-card" id="passwordResetCard">
-            <h2>Сброс пароля</h2>
-            <div class="form-group">
-                <label for="resetEmail">Email</label>
-                <input type="email" id="resetEmail" placeholder="your@email.com" required>
-            </div>
-            <button class="btn" onclick="requestPasswordReset()">Отправить письмо</button>
-            <button class="btn btn-secondary" onclick="showAuthForm()">Вернуться ко входу</button>
-            <div id="resetMessage"></div>
-        </div>
-
-        <div class="settings-card" id="settingsCard">
-            <h2>Настройки аккаунта</h2>
-            <div class="form-group">
-                <label for="settingsName">Имя</label>
-                <input type="text" id="settingsName" placeholder="Ваше имя" required>
-            </div>
-            <div class="form-group">
-                <label for="settingsEmail">Email</label>
-                <input type="email" id="settingsEmail" placeholder="your@email.com" disabled>
-                <small>Email нельзя изменить</small>
-            </div>
-            <div class="form-group">
-                <label for="newPassword">Новый пароль (оставьте пустым, если не хотите менять)</label>
-                <input type="password" id="newPassword" placeholder="Минимум 6 символов">
-            </div>
-            <div class="form-group">
-                <label for="confirmPassword">Подтвердите новый пароль</label>
-                <input type="password" id="confirmPassword" placeholder="Повторите новый пароль">
-            </div>
-            <button class="btn" onclick="updateProfile()">Сохранить изменения</button>
-            <button class="btn btn-secondary" onclick="showBookingForm()">Вернуться к бронированию</button>
-            <div id="settingsMessage"></div>
-        </div>
-
-        <div class="booking-card" id="bookingCard">
-            <div class="room-info">
-                <div class="room-title">Читальный зал</div>
-                <div class="room-desc">Место для учебы, работы и отдыха.</div>
-            </div>
-
-            <div class="form-group">
-                <label for="bookingDate">Дата</label>
-                <input type="date" id="bookingDate">
-            </div>
-
-            <div class="form-group date-time-group">
-                <div>
-                    <label for="time-start">Начало</label>
-                    <input type="time" id="time-start" required>
-                </div>
-                <div>
-                    <label for="time-end">Конец</label>
-                    <input type="time" id="time-end" required>
-                </div>
-            </div>
-            <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
-
-            <button class="btn" onclick="createBooking()">Забронировать</button>
-            <button class="btn btn-secondary" onclick="signOut()">Выйти</button>
-            <button class="btn btn-secondary" onclick="showSettings()">Настройки</button>
-
-            <div id="bookingMessage"></div>
-
-            <div class="bookings-list">
-                <h3>Мои брони</h3>
-                <div id="bookingsList"></div>
-            </div>
-
-            <div class="bookings-list" style="margin-top: 30px;">
-                <h3>Все брони</h3>
-                <div id="allBookingsList"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="bookingModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <div class="modal-info" id="modalInfo"></div>
-        </div>
-    </div>
-
-    <script>
+<script>
 const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM';
 
@@ -419,7 +40,7 @@ async function checkUserAndRedirect() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('bookingDate').value = today;
             document.getElementById('bookingDate').min = today;
-            document.getElementById('bookingDate').max = today; // Ограничиваем выбор будущих дат
+            // Removed the max attribute to allow cross-day bookings
             
             await cleanupOldBookings();
             await checkUserAndRedirect();
@@ -532,22 +153,26 @@ async function checkUserAndRedirect() {
             }
             
             const startTime = new Date(date + 'T' + timeStart);
-            const endTime = new Date(date + 'T' + timeEnd);
-
-            // Проверка, что время окончания позже времени начала в рамках одного дня
-            if (endTime <= startTime) {
-                showMessage('bookingMessage', 'Время окончания должно быть позже времени начала', 'error');
-                return;
-            }
+            let endTime = new Date(date + 'T' + timeEnd);
 
             if (isNaN(startTime) || isNaN(endTime)) {
                 showMessage('bookingMessage', 'Неверная дата или время', 'error');
                 return;
             }
 
-            const durationHours = (endTime - startTime) / (1000 * 60 * 60);
+            // Если время окончания раньше времени начала, значит, бронь переходит на следующий день
+            if (endTime <= startTime) {
+                endTime.setDate(endTime.getDate() + 1);
+            }
+
+            const durationMs = endTime - startTime;
+            const maxDurationMs = 4 * 60 * 60 * 1000;
             
-            if (durationHours > 4.01) {
+            if (durationMs <= 0) {
+                 showMessage('bookingMessage', 'Время окончания должно быть позже времени начала.', 'error');
+                return;
+            }
+            if (durationMs > maxDurationMs) {
                 showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
                 return;
             }
@@ -579,13 +204,10 @@ async function checkUserAndRedirect() {
 
         async function checkTimeAvailability(newStartTime, newEndTime) {
             try {
-                const date = newStartTime.toISOString().split('T')[0];
                 const { data: existingBookings, error } = await supabase
                     .from('bookings')
                     .select('start, end')
-                    .eq('room', 'Читальный зал')
-                    .gte('start', date + 'T00:00:00.000Z') // Выбираем бронирования только на текущий день
-                    .lte('start', date + 'T23:59:59.999Z');
+                    .eq('room', 'Читальный зал');
 
                 if (error) {
                     console.error('Ошибка при проверке доступности времени:', error);
@@ -838,5 +460,3 @@ async function checkUserAndRedirect() {
             }, 5000);
         }
     </script>
-</body>
-</html>
