@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>Создание админа</title>
+    <title>Админ-панель</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         :root {
             --primary-color: #6a11cb;
@@ -11,17 +12,20 @@
             --background-color: #f6f8fb;
             --card-background: #ffffff;
             --text-color: #333;
+            --subtle-text-color: #777;
+            --border-color: #e0e0e0;
             --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
             --border-radius: 16px;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 22px;
             background: var(--background-color);
             color: var(--text-color);
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
         }
 
@@ -31,38 +35,75 @@
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
             width: 100%;
-            max-width: 450px;
-            text-align: center;
+            max-width: 900px;
+            margin-top: 50px;
         }
 
-        h2 {
+        h2, h3 {
+            text-align: center;
             color: var(--primary-color);
             margin-bottom: 20px;
         }
 
-        .form-group {
+        .tabs {
+            display: flex;
+            justify-content: center;
             margin-bottom: 20px;
-            text-align: left;
+            border-bottom: 2px solid var(--border-color);
         }
 
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 15px 30px;
+            cursor: pointer;
             font-size: 16px;
+            color: var(--subtle-text-color);
+            transition: color 0.3s, border-bottom 0.3s;
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
         }
 
         button {
-            width: 100%;
-            padding: 15px;
             background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
             color: white;
+            padding: 10px 15px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
@@ -70,85 +111,180 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
-
-        #statusMessage {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            font-weight: bold;
-        }
-
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Создание админ-аккаунта</h2>
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" placeholder="Введите email" required>
-        </div>
-        <div class="form-group">
-            <label for="password">Пароль</label>
-            <input type="password" id="password" placeholder="Введите пароль" required>
-        </div>
-        <button id="createAdminBtn">Создать администратора</button>
-        <div id="statusMessage"></div>
+
+<div class="container">
+    <h2>Админ-панель</h2>
+    <p>Вы вошли как <span id="user-email"></span></p>
+
+    <div class="tabs">
+        <button class="tab-button active" onclick="showTab('users')">Пользователи</button>
+        <button class="tab-button" onclick="showTab('bookings')">Бронирования</button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script>
-        const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co'; // Замените на ваш URL
-        const SUPABASE_SERVICE_ROLE_KEY = 'YOUR_SUPABASE_SERVICE_ROLE_KEY'; // **ВНИМАНИЕ: Это ваш секретный ключ!**
+    <div id="users-tab" class="tab-content active">
+        <h3>Все пользователи</h3>
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>ID</th>
+                    <th>Дата создания</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
 
-        const createAdminBtn = document.getElementById('createAdminBtn');
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const statusMessage = document.getElementById('statusMessage');
+    <div id="bookings-tab" class="tab-content">
+        <h3>Все бронирования</h3>
+        <table id="bookingsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Комната</th>
+                    <th>Дата</th>
+                    <th>Время</th>
+                    <th>Пользователь</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
 
-        // Создаем клиент Supabase с service_role ключом
-        const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-            }
-        });
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+    const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co'; // Замените на ваш URL
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM'; // Замените на ваш ключ
+    const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        createAdminBtn.addEventListener('click', async () => {
-            const email = emailInput.value;
-            const password = passwordInput.value;
+    async function checkAuth() {
+        const { data: { user }, error } = await supabase.auth.getUser();
 
-            if (!email || !password) {
-                showMessage('error', 'Пожалуйста, заполните все поля.');
-                return;
-            }
+        if (error || !user) {
+            alert('Сначала войдите в систему.');
+            location.href = '/'; // Перенаправляем на главную
+            return;
+        }
+        
+        // **ВАЖНО**: Проверка роли администратора
+        // Этот код предполагает, что у вас есть колонка `is_admin` в таблице `profiles`
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single();
+            
+        if (profileError || !profile || !profile.is_admin) {
+             alert('Доступ запрещен. Только для администраторов.');
+             location.href = '/';
+             return;
+        }
 
-            // Используем метод 'admin.createUser' для создания пользователя
-            const { data, error } = await supabase.auth.admin.createUser({
-                email: email,
-                password: password,
-                user_metadata: { is_admin: true } // Устанавливаем роль администратора
+        document.getElementById('user-email').textContent = user.email;
+        fetchAdminData(user.id);
+    }
+
+    async function fetchAdminData(userId) {
+        try {
+            const token = (await supabase.auth.getSession()).data.session.access_token;
+
+            const response = await fetch('/.netlify/functions/get-admin-data', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
-            if (error) {
-                showMessage('error', `Ошибка: ${error.message}`);
-            } else {
-                showMessage('success', `Администратор ${data.user.email} успешно создан!`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error);
             }
-        });
 
-        function showMessage(type, message) {
-            statusMessage.className = type;
-            statusMessage.textContent = message;
+            const { users, bookings } = await response.json();
+            displayUsers(users);
+            displayBookings(bookings);
+
+        } catch (error) {
+            console.error('Ошибка при получении данных:', error);
+            alert('Не удалось загрузить данные: ' + error.message);
         }
-    </script>
+    }
+
+    function displayUsers(users) {
+        const tableBody = document.getElementById('usersTable').querySelector('tbody');
+        tableBody.innerHTML = ''; // Очищаем старые данные
+        users.forEach(user => {
+            const row = `<tr>
+                <td>${user.email}</td>
+                <td>${user.id}</td>
+                <td>${new Date(user.created_at).toLocaleString()}</td>
+            </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function displayBookings(bookings) {
+        const tableBody = document.getElementById('bookingsTable').querySelector('tbody');
+        tableBody.innerHTML = ''; // Очищаем старые данные
+        bookings.forEach(booking => {
+            const row = `<tr>
+                <td>${booking.id}</td>
+                <td>${booking.room}</td>
+                <td>${new Date(booking.start).toLocaleDateString()}</td>
+                <td>${new Date(booking.start).toLocaleTimeString()} - ${new Date(booking.end).toLocaleTimeString()}</td>
+                <td>${booking.user_email}</td>
+                <td><button onclick="deleteBooking('${booking.id}')">Удалить</button></td>
+            </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    async function deleteBooking(bookingId) {
+        if (!confirm('Вы уверены, что хотите удалить эту бронь?')) {
+            return;
+        }
+
+        try {
+            const token = (await supabase.auth.getSession()).data.session.access_token;
+            
+            const response = await fetch('/.netlify/functions/delete-booking', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ bookingId })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error);
+            }
+
+            alert('Бронь успешно удалена!');
+            fetchAdminData(); // Обновляем данные
+
+        } catch (error) {
+            console.error('Ошибка при удалении брони:', error);
+            alert('Ошибка при удалении брони: ' + error.message);
+        }
+    }
+
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName + '-tab').classList.add('active');
+        document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`).classList.add('active');
+    }
+
+    // Инициализация
+    checkAuth();
+</script>
 </body>
 </html>
