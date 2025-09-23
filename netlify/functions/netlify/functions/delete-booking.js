@@ -2,100 +2,89 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  // Добавляем CORS headers
+  // CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method not allowed' };
 
-  // Обрабатываем OPTIONS запрос (preflight)
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Server not configured' }) };
   }
 
-  if (event.httpMethod !== 'POST') {
-    return { 
-      statusCode: 405, 
-      headers,
-      body: 'Method not allowed' 
-    };
-  }
-  
-  // Ваши данные Supabase
-  const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
-  const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
-
+  // parse body
   let body;
-  try {
-    body = JSON.parse(event.body);
-    console.log('Received booking_id:', body.booking_id);
-  } catch (e) {
-    return { 
-      statusCode: 400, 
-      headers,
-      body: JSON.stringify({ error: 'Invalid JSON' }) 
-    };
-  }
+  try { body = JSON.parse(event.body); }
+  catch (e) { return { statusCode:400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
+  const bookingId = body.booking_id || body.bookingId;
+  if (!bookingId) return { statusCode:400, headers, body: JSON.stringify({ error: 'Missing booking_id' }) };
 
-  const { booking_id } = body;
-  if (!booking_id) {
-    return { 
-      statusCode: 400, 
-      headers,
-      body: JSON.stringify({ error: 'Missing booking_id' }) 
-    };
+  // get token from Authorization header
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { statusCode:401, headers, body: JSON.stringify({ error: 'No auth token' }) };
   }
+  const token = authHeader.replace('Bearer ', '');
 
   try {
-    // Используем fetch для удаления
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${booking_id}`, {
-      method: 'DELETE',
-      headers: { 
-        'apikey': SERVICE_KEY, 
-        'Authorization': `Bearer ${SERVICE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      }
+    // 1) resolve token -> user info
+    const whoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
-    
-    console.log('Delete response status:', res.status);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Supabase error:', errorText);
-      return { 
-        statusCode: 500, 
-        headers,
-        body: JSON.stringify({ 
-          error: 'Failed to delete booking',
-          details: errorText
-        }) 
-      };
+    if (!whoRes.ok) return { statusCode:401, headers, body: JSON.stringify({ error: 'Invalid token' }) };
+    const user = await whoRes.json();
+    const requesterId = user.id;
+
+    // 2) fetch booking to check owner
+    const bookingRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}&select=*`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
+    });
+    if (!bookingRes.ok) {
+      const t = await bookingRes.text();
+      return { statusCode:500, headers, body: JSON.stringify({ error: 'Failed to fetch booking', details: t }) };
     }
-    
-    return { 
-      statusCode: 200, 
-      headers,
-      body: JSON.stringify({ 
-        message: 'Booking deleted successfully',
-        booking_id: booking_id
-      }) 
-    };
-    
-  } catch (error) {
-    console.error('Fetch error:', error);
-    return { 
-      statusCode: 500, 
-      headers,
-      body: JSON.stringify({ 
-        error: 'Network error',
-        details: error.message 
-      }) 
-    };
+    const bookings = await bookingRes.json();
+    if (!bookings || bookings.length === 0) {
+      return { statusCode:404, headers, body: JSON.stringify({ error: 'Booking not found' }) };
+    }
+    const booking = bookings[0];
+
+    // 3) if requester is owner -> allow deletion
+    if (booking.user_id === requesterId) {
+      // proceed to delete
+    } else {
+      // 4) check if requester is admin via profiles table
+      const profRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${requesterId}&select=is_admin`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
+      });
+      if (!profRes.ok) {
+        const t = await profRes.text();
+        return { statusCode:500, headers, body: JSON.stringify({ error: 'Failed to check admin', details: t }) };
+      }
+      const prof = await profRes.json();
+      const isAdmin = Array.isArray(prof) && prof[0] && prof[0].is_admin;
+      if (!isAdmin) return { statusCode:403, headers, body: JSON.stringify({ error: 'Forbidden' }) };
+      // else proceed (admin allowed)
+    }
+
+    // 5) delete booking
+    const delRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Prefer': 'return=minimal' }
+    });
+    if (!delRes.ok) {
+      const t = await delRes.text();
+      return { statusCode:500, headers, body: JSON.stringify({ error: 'Failed to delete booking', details: t }) };
+    }
+
+    return { statusCode:200, headers, body: JSON.stringify({ success: true, booking_id: bookingId }) };
+  } catch (err) {
+    console.error('delete-booking error:', err);
+    return { statusCode:500, headers, body: JSON.stringify({ error: 'Internal error', details: err.message }) };
   }
 };
