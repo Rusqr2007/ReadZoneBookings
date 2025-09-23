@@ -616,120 +616,91 @@
             showAuthForm();
         }
 
-        async function createBooking() {
-            const date = document.getElementById('bookingDate').value;
-            const timeStart = document.getElementById('time-start').value;
-            const timeEnd = document.getElementById('time-end').value;
-            const comment = document.getElementById('bookingComment').value.trim();
+async function createBooking() {
+    const date = document.getElementById('bookingDate').value;
+    const timeStart = document.getElementById('time-start').value;
+    const timeEnd = document.getElementById('time-end').value;
+    const comment = document.getElementById('bookingComment').value.trim();
 
-            if (!date || !timeStart || !timeEnd) {
-                showMessage('bookingMessage', 'Заполните все поля', 'error');
-                return;
-            }
-            
-            const startTime = new Date(date + 'T' + timeStart);
-            const endTime = new Date(date + 'T' + timeEnd);
+    if (!date || !timeStart || !timeEnd) {
+        showMessage('bookingMessage', 'Заполните все поля', 'error');
+        return;
+    }
+    
+    const startTime = new Date(date + 'T' + timeStart);
+    const endTime = new Date(date + 'T' + timeEnd);
 
-            if (isNaN(startTime) || isNaN(endTime)) {
-                showMessage('bookingMessage', 'Неверная дата или время', 'error');
-                return;
-            }
+    if (isNaN(startTime) || isNaN(endTime)) {
+        showMessage('bookingMessage', 'Неверная дата или время', 'error');
+        return;
+    }
 
-            if (endTime <= startTime) {
-                endTime.setDate(endTime.getDate() + 1);
-            }
+    if (endTime <= startTime) {
+        endTime.setDate(endTime.getDate() + 1);
+    }
 
-            const durationMs = endTime - startTime;
-            const maxDurationMs = 4 * 60 * 60 * 1000;
-            
-            if (durationMs <= 0) {
-                showMessage('bookingMessage', 'Время окончания должно быть позже времени начала.', 'error');
-                return;
-            }
-            if (durationMs > maxDurationMs) {
-                showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
-                return;
-            }
-            
-            const isTimeAvailable = await checkTimeAvailability(startTime, endTime);
-            if (!isTimeAvailable) {
-                showMessage('bookingMessage', 'На выбранное время уже есть бронь. Выберите другое время.', 'error');
-                return;
-            }
-            
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('user_name, is_public')
-                .eq('id', currentUser.id)
-                .single();
+    const durationMs = endTime - startTime;
+    const maxDurationMs = 4 * 60 * 60 * 1000;
+    
+    if (durationMs <= 0) {
+        showMessage('bookingMessage', 'Время окончания должно быть позже времени начала.', 'error');
+        return;
+    }
+    if (durationMs > maxDurationMs) {
+        showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
+        return;
+    }
+    
+    const isTimeAvailable = await checkTimeAvailability(startTime, endTime);
+    if (!isTimeAvailable) {
+        showMessage('bookingMessage', 'На выбранное время уже есть бронь. Выберите другое время.', 'error');
+        return;
+    }
+    
+    // ИСПРАВЛЕННАЯ ЧАСТЬ: используем maybeSingle() вместо single()
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_name, is_public')
+        .eq('id', currentUser.id)
+        .maybeSingle(); // Исправлено на maybeSingle()
 
-            if (profileError) {
-                showMessage('bookingMessage', 'Ошибка при проверке настроек профиля: ' + profileError.message, 'error');
-                return;
-            }
+    if (profileError) {
+        showMessage('bookingMessage', 'Ошибка при проверке настроек профиля: ' + profileError.message, 'error');
+        return;
+    }
 
-            const displayName = profile.user_name || currentUser.user_metadata?.user_name || 'Неизвестно';
-            const isPublic = profile.is_public !== false;
-            
-            let displayText;
-            if (isPublic) {
-                displayText = displayName !== 'Неизвестно' ? `${displayName} (${currentUser.email})` : currentUser.email;
-            } else {
-                displayText = displayName !== 'Неизвестно' ? displayName : 'Анонимный пользователь';
-            }
+    // Обрабатываем случай когда профиль не найден
+    const displayName = profile?.user_name || currentUser.user_metadata?.user_name || 'Неизвестно';
+    const isPublic = profile?.is_public !== false; // По умолчанию true если профиль не найден
+    
+    let displayText;
+    if (isPublic) {
+        displayText = displayName !== 'Неизвестно' ? `${displayName} (${currentUser.email})` : currentUser.email;
+    } else {
+        displayText = displayName !== 'Неизвестно' ? displayName : 'Анонимный пользователь';
+    }
 
-            const { error } = await supabase
-                .from('bookings')
-                .insert([{
-                    user_id: currentUser.id,
-                    user_email: isPublic ? currentUser.email : null,
-                    display_name: displayText,
-                    is_public: isPublic,
-                    room: 'Читальный зал',
-                    start: startTime.toISOString(),
-                    end: endTime.toISOString(),
-                    comment: comment
-                }]);
-            
-            if (error) {
-                showMessage('bookingMessage', 'Ошибка при создании брони: ' + error.message, 'error');
-            } else {
-                showMessage('bookingMessage', 'Бронь создана успешно!', 'success');
-                loadUserBookings();
-                loadAllBookings();
-            }
-        }
-
-        async function checkTimeAvailability(newStartTime, newEndTime) {
-            try {
-                const { data: existingBookings, error } = await supabase
-                    .from('bookings')
-                    .select('start, end')
-                    .eq('room', 'Читальный зал');
-
-                if (error) {
-                    console.error('Ошибка при проверке доступности времени:', error);
-                    return true;
-                }
-
-                if (!existingBookings || existingBookings.length === 0) {
-                    return true;
-                }
-
-                for (const booking of existingBookings) {
-                    const existingStart = new Date(booking.start);
-                    const existingEnd = new Date(booking.end);
-
-                    if (newStartTime < existingEnd && newEndTime > existingStart) {
-                        return false;
-                    }
-                }
-                return true;
-            } catch (err) {
-                console.error('Ошибка при проверке доступности:', err);
-                return true;
-            }
-        }
+    const { error } = await supabase
+        .from('bookings')
+        .insert([{
+            user_id: currentUser.id,
+            user_email: isPublic ? currentUser.email : null,
+            display_name: displayText,
+            is_public: isPublic,
+            room: 'Читальный зал',
+            start: startTime.toISOString(),
+            end: endTime.toISOString(),
+            comment: comment
+        }]);
+    
+    if (error) {
+        showMessage('bookingMessage', 'Ошибка при создании брони: ' + error.message, 'error');
+    } else {
+        showMessage('bookingMessage', 'Бронь создана успешно!', 'success');
+        loadUserBookings();
+        loadAllBookings();
+    }
+}
         
         async function loadUserBookings() {
             const { data: bookings, error } = await supabase
