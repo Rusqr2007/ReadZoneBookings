@@ -556,8 +556,19 @@
             
             if (error) {
                 showMessage('authMessage', error.message, 'error');
-            } else {
-                showMessage('authMessage', 'Регистрация успешна! Проверьте email для подтверждения.', 'success');
+            } else if (data.user) {
+                // Добавляем запись в таблицу profiles после успешной регистрации
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .insert([
+                        { id: data.user.id, user_name: name, is_public: true, email: email }
+                    ]);
+
+                if (profileError) {
+                    showMessage('authMessage', 'Ошибка при создании профиля: ' + profileError.message, 'error');
+                } else {
+                    showMessage('authMessage', 'Регистрация успешна! Проверьте email для подтверждения.', 'success');
+                }
             }
         }
 
