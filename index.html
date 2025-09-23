@@ -394,7 +394,7 @@
                 <input type="password" id="confirmPassword" placeholder="Повторите новый пароль">
             </div>
             <label class="checkbox-container">
-                Скрыть мою почту в списке броней
+                Скрыть мою почту в списке броней (будет отображаться только имя)
                 <input type="checkbox" id="hideProfileCheckbox">
                 <span class="checkmark"></span>
             </label>
@@ -483,8 +483,9 @@
             
                 if (profile) {
                     currentUser = user;
+                    currentUser.user_metadata = currentUser.user_metadata || {};
                     currentUser.user_metadata.user_name = profile.user_name;
-                    isProfilePublic = profile.is_public;
+                    isProfilePublic = profile.is_public !== false;
                     if (profile.is_admin) {
                         console.log("Администратор вошёл в систему. Перенаправление...");
                         window.location.href = '/admin.html';
@@ -627,7 +628,7 @@
             }
             
             const startTime = new Date(date + 'T' + timeStart);
-            let endTime = new Date(date + 'T' + timeEnd);
+            const endTime = new Date(date + 'T' + timeEnd);
 
             if (isNaN(startTime) || isNaN(endTime)) {
                 showMessage('bookingMessage', 'Неверная дата или время', 'error');
@@ -642,7 +643,7 @@
             const maxDurationMs = 4 * 60 * 60 * 1000;
             
             if (durationMs <= 0) {
-                 showMessage('bookingMessage', 'Время окончания должно быть позже времени начала.', 'error');
+                showMessage('bookingMessage', 'Время окончания должно быть позже времени начала.', 'error');
                 return;
             }
             if (durationMs > maxDurationMs) {
@@ -660,23 +661,29 @@
                 .from('profiles')
                 .select('user_name, is_public')
                 .eq('id', currentUser.id)
-                .maybeSingle();
+                .single();
 
             if (profileError) {
                 showMessage('bookingMessage', 'Ошибка при проверке настроек профиля: ' + profileError.message, 'error');
                 return;
             }
 
-            const displayName = profile?.user_name || currentUser.user_metadata?.user_name || 'Неизвестно';
-            const isPublic = profile?.is_public === true;
-            const userEmail = isPublic ? currentUser.email : 'Анонимный пользователь';
+            const displayName = profile.user_name || currentUser.user_metadata?.user_name || 'Неизвестно';
+            const isPublic = profile.is_public !== false;
+            
+            let displayText;
+            if (isPublic) {
+                displayText = displayName !== 'Неизвестно' ? `${displayName} (${currentUser.email})` : currentUser.email;
+            } else {
+                displayText = displayName !== 'Неизвестно' ? displayName : 'Анонимный пользователь';
+            }
 
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
-                    user_email: userEmail,
-                    display_name: displayName,
+                    user_email: isPublic ? currentUser.email : null,
+                    display_name: displayText,
                     is_public: isPublic,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
@@ -713,9 +720,7 @@
                     const existingStart = new Date(booking.start);
                     const existingEnd = new Date(booking.end);
 
-                    if (
-                        (newStartTime < existingEnd && newEndTime > existingStart)
-                    ) {
+                    if (newStartTime < existingEnd && newEndTime > existingStart) {
                         return false;
                     }
                 }
@@ -743,12 +748,23 @@
             bookingsList.innerHTML = bookings.map(booking => {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
+                
+                const startDateStr = startTime.toLocaleDateString('ru-RU');
+                const endDateStr = endTime.toLocaleDateString('ru-RU');
+                
+                let dateDisplay;
+                if (startDateStr === endDateStr) {
+                    dateDisplay = `${startDateStr} в ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`;
+                } else {
+                    dateDisplay = `${startDateStr} ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} - ${endDateStr} ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`;
+                }
+                
                 const duration = Math.round((endTime - startTime) / (1000 * 60 * 60));
                 const commentHtml = booking.comment ? `<div class="booking-comment">${booking.comment}</div>` : '';
                 
                 return `
                     <div class="booking-item" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${startTime.toLocaleDateString('ru-RU')} в ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                        <div class="booking-time">${dateDisplay}</div>
                         <div class="booking-duration">Длительность: ${duration} час(а)</div>
                         ${commentHtml}
                     </div>
@@ -775,14 +791,22 @@
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
                 
-                const displayName = booking.display_name || 'Неизвестно';
-                const userEmail = booking.is_public === false ? 'Анонимный пользователь' : (booking.user_email || 'Неизвестно');
+                const startDateStr = startTime.toLocaleDateString('ru-RU');
+                const endDateStr = endTime.toLocaleDateString('ru-RU');
+                
+                let dateDisplay;
+                if (startDateStr === endDateStr) {
+                    dateDisplay = `${startDateStr} с ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`;
+                } else {
+                    dateDisplay = `${startDateStr} ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} - ${endDateStr} ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`;
+                }
+                
                 const commentHtml = booking.comment ? `<div class="booking-comment">${booking.comment}</div>` : '';
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${displayName} (${userEmail}) — ${booking.room}</div>
-                        <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                        <div class="booking-time">${booking.display_name} — ${booking.room}</div>
+                        <div class="booking-duration">${dateDisplay}</div>
                         ${commentHtml}
                     </div>
                 `;
@@ -807,8 +831,19 @@
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            const userEmail = booking.is_public === false ? 'Анонимный пользователь' : (booking.user_email || 'Не указан');
-            const displayName = booking.display_name || 'Не указан';
+            const startTime = new Date(booking.start);
+            const endTime = new Date(booking.end);
+            
+            const startDateStr = startTime.toLocaleDateString('ru-RU');
+            const endDateStr = endTime.toLocaleDateString('ru-RU');
+            
+            let dateDisplay;
+            if (startDateStr === endDateStr) {
+                dateDisplay = `${startDateStr} с ${startTime.toLocaleTimeString('ru-RU')} до ${endTime.toLocaleTimeString('ru-RU')}`;
+            } else {
+                dateDisplay = `${startDateStr} ${startTime.toLocaleTimeString('ru-RU')} - ${endDateStr} ${endTime.toLocaleTimeString('ru-RU')}`;
+            }
+            
             const commentHtml = booking.comment ? `<p><span class="modal-item-label">Комментарий:</span> ${booking.comment}</p>` : '';
 
             let deleteButtonHTML = '';
@@ -819,9 +854,8 @@
             modalInfo.innerHTML = `
                 <h3 class="modal-title">Детали бронирования</h3>
                 <p><span class="modal-item-label">Комната:</span> ${booking.room}</p>
-                <p><span class="modal-item-label">Дата:</span> ${new Date(booking.start).toLocaleDateString('ru-RU')}</p>
-                <p><span class="modal-item-label">Время:</span> ${new Date(booking.start).toLocaleTimeString('ru-RU')} - ${new Date(booking.end).toLocaleTimeString('ru-RU')}</p>
-                <p><span class="modal-item-label">Забронировал:</span> ${displayName} (${userEmail})</p>
+                <p><span class="modal-item-label">Время:</span> ${dateDisplay}</p>
+                <p><span class="modal-item-label">Забронировал:</span> ${booking.display_name}</p>
                 ${commentHtml}
                 ${deleteButtonHTML}
             `;
@@ -888,7 +922,7 @@
             const newName = document.getElementById('settingsName').value.trim();
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
-            const isPublic = !document.getElementById('hideProfileCheckbox').checked;
+            const isPublic = document.getElementById('hideProfileCheckbox').checked === false;
 
             if (!newName) {
                 showMessage('settingsMessage', 'Имя не может быть пустым', 'error');
@@ -918,7 +952,6 @@
                 }
                 
                 let authUpdateError = null;
-                // Обновление имени пользователя в данных авторизации
                 const { error } = await supabase.auth.updateUser({
                     data: { user_name: newName }
                 });
