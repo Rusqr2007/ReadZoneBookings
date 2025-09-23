@@ -164,7 +164,7 @@
             color: #444;
             margin-top: 5px;
             font-style: italic;
-            white-space: pre-wrap; /* Сохраняет переносы строк */
+            white-space: pre-wrap;
         }
 
         .error {
@@ -277,6 +277,66 @@
             font-weight: 500;
             color: #555;
         }
+        
+        /* New checkbox style */
+        .checkbox-container {
+            display: block;
+            position: relative;
+            padding-left: 35px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            user-select: none;
+            text-align: left;
+            color: #555;
+        }
+
+        .checkbox-container input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+
+        .checkmark {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 25px;
+            width: 25px;
+            background-color: #eee;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-container:hover input ~ .checkmark {
+            background-color: #ccc;
+        }
+
+        .checkbox-container input:checked ~ .checkmark {
+            background-color: #667eea;
+        }
+
+        .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none;
+        }
+
+        .checkbox-container input:checked ~ .checkmark:after {
+            display: block;
+        }
+
+        .checkbox-container .checkmark:after {
+            left: 9px;
+            top: 5px;
+            width: 7px;
+            height: 13px;
+            border: solid white;
+            border-width: 0 3px 3px 0;
+            transform: rotate(45deg);
+        }
     </style>
 </head>
 <body>
@@ -333,6 +393,11 @@
                 <label for="confirmPassword">Подтвердите новый пароль</label>
                 <input type="password" id="confirmPassword" placeholder="Повторите новый пароль">
             </div>
+            <label class="checkbox-container">
+                Скрыть мою почту в списке броней
+                <input type="checkbox" id="hideProfileCheckbox">
+                <span class="checkmark"></span>
+            </label>
             <button class="btn" onclick="updateProfile()">Сохранить изменения</button>
             <button class="btn btn-secondary" onclick="showBookingForm()">Вернуться к бронированию</button>
             <div id="settingsMessage"></div>
@@ -392,48 +457,52 @@
     </div>
 
     <script>
-const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM';
+        const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let currentUser = null;
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+        let isProfilePublic = true;
 
-async function checkUserAndRedirect() {
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (user) {
-    // Читаем профиль в таблице profiles
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single();
-
-    if (error) {
-      console.error('Ошибка чтения профиля:', error.message);
-      currentUser = user;
-      showBookingForm();
-      return;
-    }
-
-    if (profile && profile.is_admin) {
-      console.log("Администратор вошёл в систему. Перенаправление...");
-      window.location.href = '/admin.html';
-    } else {
-      currentUser = user;
-      showBookingForm();
-    }
-  } else {
-    showAuthForm();
-  }
-}
-
+        async function checkUserAndRedirect() {
+          const { data: { user } } = await supabase.auth.getUser();
+        
+          if (user) {
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('is_admin, is_public')
+              .eq('id', user.id)
+              .single();
+        
+            if (error) {
+              console.error('Ошибка чтения профиля:', error.message);
+              currentUser = user;
+              showBookingForm();
+              return;
+            }
+        
+            if (profile) {
+              currentUser = user;
+              isProfilePublic = profile.is_public;
+              if (profile.is_admin) {
+                console.log("Администратор вошёл в систему. Перенаправление...");
+                window.location.href = '/admin.html';
+              } else {
+                showBookingForm();
+              }
+            } else {
+              currentUser = user;
+              showBookingForm();
+            }
+          } else {
+            showAuthForm();
+          }
+        }
         
         document.addEventListener('DOMContentLoaded', async function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('bookingDate').value = today;
             document.getElementById('bookingDate').min = today;
-            // Removed the max attribute to allow cross-day bookings
             
             await cleanupOldBookings();
             await checkUserAndRedirect();
@@ -554,7 +623,6 @@ async function checkUserAndRedirect() {
                 return;
             }
 
-            // Если время окончания раньше времени начала, значит, бронь переходит на следующий день
             if (endTime <= startTime) {
                 endTime.setDate(endTime.getDate() + 1);
             }
@@ -576,12 +644,28 @@ async function checkUserAndRedirect() {
                 showMessage('bookingMessage', 'На выбранное время уже есть бронь. Выберите другое время.', 'error');
                 return;
             }
+            
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('full_name, is_public')
+              .eq('id', currentUser.id)
+              .single();
+
+            if (profileError) {
+                showMessage('bookingMessage', 'Ошибка при проверке настроек профиля: ' + profileError.message, 'error');
+                return;
+            }
+
+            const displayName = profile.full_name || currentUser.email;
+            const displayEmail = profile.is_public ? currentUser.email : 'Анонимный пользователь';
 
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
                     user_email: currentUser.email,
+                    display_name: displayName,
+                    display_email: displayEmail,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
                     end: endTime.toISOString(),
@@ -679,12 +763,13 @@ async function checkUserAndRedirect() {
                 const startTime = new Date(booking.start);
                 const endTime = new Date(booking.end);
                 
-                const displayName = booking.user_email || 'Неизвестно';
+                const displayName = booking.display_name || 'Неизвестно';
+                const displayEmail = booking.display_email || 'Неизвестно';
                 const commentHtml = booking.comment ? `<div class="booking-comment">${booking.comment}</div>` : '';
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${displayName} — ${booking.room}</div>
+                        <div class="booking-time">${displayName} (${displayEmail}) — ${booking.room}</div>
                         <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
                         ${commentHtml}
                     </div>
@@ -710,7 +795,8 @@ async function checkUserAndRedirect() {
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            const userEmail = booking.user_email || 'Не указан';
+            const userEmail = booking.display_email || 'Не указан';
+            const displayName = booking.display_name || 'Не указан';
             const commentHtml = booking.comment ? `<p><span class="modal-item-label">Комментарий:</span> ${booking.comment}</p>` : '';
 
             let deleteButtonHTML = '';
@@ -723,7 +809,7 @@ async function checkUserAndRedirect() {
                 <p><span class="modal-item-label">Комната:</span> ${booking.room}</p>
                 <p><span class="modal-item-label">Дата:</span> ${new Date(booking.start).toLocaleDateString('ru-RU')}</p>
                 <p><span class="modal-item-label">Время:</span> ${new Date(booking.start).toLocaleTimeString('ru-RU')} - ${new Date(booking.end).toLocaleTimeString('ru-RU')}</p>
-                <p><span class="modal-item-label">Забронировал:</span> ${userEmail}</p>
+                <p><span class="modal-item-label">Забронировал:</span> ${displayName} (${userEmail})</p>
                 ${commentHtml}
                 ${deleteButtonHTML}
             `;
@@ -767,9 +853,20 @@ async function checkUserAndRedirect() {
 
         async function loadUserSettings() {
             if (currentUser) {
+                const { data: profile, error } = await supabase
+                  .from('profiles')
+                  .select('full_name, is_public')
+                  .eq('id', currentUser.id)
+                  .single();
+                  
+                if (profile) {
+                    document.getElementById('settingsName').value = profile.full_name || '';
+                    document.getElementById('hideProfileCheckbox').checked = !profile.is_public;
+                } else {
+                    document.getElementById('settingsName').value = currentUser.user_metadata?.full_name || '';
+                }
+                
                 document.getElementById('settingsEmail').value = currentUser.email;
-                const fullName = currentUser.user_metadata?.full_name || '';
-                document.getElementById('settingsName').value = fullName;
                 document.getElementById('newPassword').value = '';
                 document.getElementById('confirmPassword').value = '';
             }
@@ -779,6 +876,7 @@ async function checkUserAndRedirect() {
             const newName = document.getElementById('settingsName').value.trim();
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
+            const isPublic = !document.getElementById('hideProfileCheckbox').checked;
 
             if (!newName) {
                 showMessage('settingsMessage', 'Имя не может быть пустым', 'error');
@@ -797,22 +895,34 @@ async function checkUserAndRedirect() {
             }
 
             try {
-                const updateData = {
-                    data: { full_name: newName }
-                };
-
-                if (newPassword) {
-                    updateData.password = newPassword;
+                const { error: profileError } = await supabase
+                  .from('profiles')
+                  .update({ full_name: newName, is_public: isPublic })
+                  .eq('id', currentUser.id);
+                  
+                if (profileError) {
+                    showMessage('settingsMessage', 'Ошибка обновления профиля: ' + profileError.message, 'error');
+                    return;
                 }
-
-                const { error } = await supabase.auth.updateUser(updateData);
-
-                if (error) {
-                    showMessage('settingsMessage', 'Ошибка обновления: ' + error.message, 'error');
+                
+                let authUpdateError = null;
+                if (newPassword) {
+                    const { error } = await supabase.auth.updateUser({
+                        password: newPassword
+                    });
+                    authUpdateError = error;
+                }
+                
+                if (authUpdateError) {
+                    showMessage('settingsMessage', 'Ошибка обновления пароля: ' + authUpdateError.message, 'error');
                 } else {
                     showMessage('settingsMessage', 'Настройки успешно обновлены!', 'success');
                     document.getElementById('newPassword').value = '';
                     document.getElementById('confirmPassword').value = '';
+                    isProfilePublic = isPublic;
+                    
+                    loadUserBookings();
+                    loadAllBookings();
                 }
             } catch (err) {
                 showMessage('settingsMessage', 'Произошла ошибка при обновлении настроек', 'error');
