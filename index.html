@@ -10,7 +10,7 @@
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
         .container{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-radius:20px;padding:40px;box-shadow:0 20px 40px rgba(0,0,0,.1);width:100%;max-width:650px;text-align:center}
         h1{color:#333;margin-bottom:10px;font-size:2rem;font-weight:600}.subtitle{color:#666;margin-bottom:30px;font-size:.9rem}.form-group{margin-bottom:20px;text-align:left}label{display:block;margin-bottom:8px;color:#555;font-weight:500;font-size:.9rem}input,select,textarea{width:100%;padding:12px;border:2px solid #e1e5e9;border-radius:12px;font-size:16px;background:white}.date-time-group{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;margin-top:10px}.btn-secondary{background:#6c757d}.auth-card,.booking-card,.password-reset-card,.settings-card{display:none}.auth-card.active,.booking-card.active,.password-reset-card.active,.settings-card.active{display:block}.bookings-list{margin-top:20px;text-align:left}.booking-item{background:#f8f9fa;padding:12px;border-radius:10px;margin-bottom:10px;border-left:4px solid #667eea;cursor:pointer}.booking-time{font-weight:600;color:#333}.booking-duration{color:#666;font-size:.9rem}.booking-comment{font-size:.9rem;color:#444;margin-top:5px;font-style:italic;white-space:pre-wrap}.error{color:#dc3545;font-size:.9rem;margin-top:5px}.success{color:#28a745;font-size:.9rem;margin-top:5px}.room-info{background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:16px;border-radius:12px;margin-bottom:20px;text-align:left}.room-title{font-size:1.1rem;font-weight:600;color:#333;margin-bottom:4px}.info-text{color:#555;font-size:.9rem;margin-top:-8px;margin-bottom:16px;text-align:left}.modal{display:none;position:fixed;z-index:1;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);justify-content:center;align-items:center}.modal-content{background:#fff;padding:16px;border-radius:10px;width:90%;max-width:420px;position:relative}.close-btn{position:absolute;right:12px;top:6px;font-size:22px;cursor:pointer}.checkbox-container{display:block;position:relative;padding-left:35px;margin-bottom:10px;cursor:pointer;font-size:.9rem;color:#555;text-align:left}.checkbox-container input{position:absolute;opacity:0;cursor:pointer;height:0;width:0}.checkmark{position:absolute;left:0;top:0;height:22px;width:22px;background:#eee;border-radius:6px}.checkbox-container input:checked ~ .checkmark{background:#667eea}.checkmark:after{content:"";position:absolute;display:none}.checkbox-container input:checked ~ .checkmark:after{display:block}.checkbox-container .checkmark:after{left:8px;top:4px;width:6px;height:12px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}
-        .privacy-options {display:flex;gap:15px;margin:10px 0}.privacy-option label{display:flex;align-items:center;gap:5px;cursor:pointer}.privacy-option input[type="radio"]{width:auto}.privacy-badge{font-size:0.7rem;padding:2px 6px;border-radius:10px;margin-left:5px;background:#667eea;color:white}
+        .privacy-options {display:flex;gap:15px;margin:10px 0}.privacy-option label{display:flex;align-items:center;gap:5px;cursor:pointer}.privacy-option input[type="radio"]{width:auto}
         .modal-delete-btn{background:#dc3545;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:10px}
     </style>
 </head>
@@ -43,7 +43,21 @@
       <div class="form-group"><label for="settingsEmail">Email</label><input type="email" id="settingsEmail" disabled><small>Email нельзя изменить</small></div>
       <div class="form-group"><label for="newPassword">Новый пароль</label><input type="password" id="newPassword"></div>
       <div class="form-group"><label for="confirmPassword">Подтвердите пароль</label><input type="password" id="confirmPassword"></div>
-      <label class="checkbox-container">Скрыть мою почту в списке броней по умолчанию<input type="checkbox" id="hideProfileCheckbox"><span class="checkmark"></span></label>
+      
+      <div class="form-group">
+        <label>Что показывать другим в бронях:</label>
+        <div class="privacy-options">
+          <div class="privacy-option">
+            <input type="radio" id="privacy-name" name="privacy" value="name">
+            <label for="privacy-name">Показывать имя</label>
+          </div>
+          <div class="privacy-option">
+            <input type="radio" id="privacy-email" name="privacy" value="email">
+            <label for="privacy-email">Показывать email</label>
+          </div>
+        </div>
+      </div>
+      
       <button class="btn" id="btnSaveSettings">Сохранить</button>
       <button class="btn btn-secondary" id="btnBackToBooking">Назад</button>
       <div id="settingsMessage"></div>
@@ -58,24 +72,6 @@
       <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
 
       <div class="form-group"><label for="bookingComment">Комментарий</label><textarea id="bookingComment" rows="3" placeholder="Цель бронирования"></textarea></div>
-      
-      <div class="form-group">
-        <label>Видимость брони для других:</label>
-        <div class="privacy-options">
-          <div class="privacy-option">
-            <input type="radio" id="privacy-public" name="privacy" value="public" checked>
-            <label for="privacy-public">Показывать имя</label>
-          </div>
-          <div class="privacy-option">
-            <input type="radio" id="privacy-email" name="privacy" value="email">
-            <label for="privacy-email">Показывать email</label>
-          </div>
-          <div class="privacy-option">
-            <input type="radio" id="privacy-anonymous" name="privacy" value="anonymous">
-            <label for="privacy-anonymous">Анонимно</label>
-          </div>
-        </div>
-      </div>
 
       <button class="btn" id="btnCreateBooking">Забронировать</button>
       <button class="btn btn-secondary" id="btnSignOut">Выйти</button>
@@ -150,11 +146,11 @@
     // гарантируем, что профиль есть (решает проблему FK)
     const safeName = currentUser.user_metadata?.user_name || null;
     const safeEmail = currentUser.email || null;
-    const { error: upsertErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: safeName, email: safeEmail, is_public: true }], { onConflict: 'id' });
+    const { error: upsertErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: safeName, email: safeEmail, show_email: false }], { onConflict: 'id' });
     if(upsertErr) console.error('profile ensure error', upsertErr);
 
     // получаем профиль (если админ — редирект)
-    const { data: profile, error } = await supabase.from('profiles').select('user_name, is_public, is_admin').eq('id', currentUser.id).maybeSingle();
+    const { data: profile, error } = await supabase.from('profiles').select('user_name, show_email, is_admin').eq('id', currentUser.id).maybeSingle();
     if(error) console.error('Не удалось загрузить профиль', error);
     else if(profile?.is_admin){ window.location.href = '/admin.html'; return; }
 
@@ -177,7 +173,7 @@
     if(error){ showMessage('authMessage', error.message); return; }
 
     const userId = data?.user?.id;
-    if(userId){ const { error: pe } = await supabase.from('profiles').upsert([{ id: userId, user_name: name, is_public: true, email }], { onConflict: 'id' }); if(pe) console.error('profile upsert error', pe); }
+    if(userId){ const { error: pe } = await supabase.from('profiles').upsert([{ id: userId, user_name: name, show_email: false, email }], { onConflict: 'id' }); if(pe) console.error('profile upsert error', pe); }
     showMessage('authMessage','Регистрация инициирована. Проверьте почту для подтверждения.', 'success');
   }
 
@@ -202,10 +198,17 @@
   // --- PROFILE / SETTINGS ---
   async function loadUserSettings(){ 
     if(!currentUser) return; 
-    const { data: profile } = await supabase.from('profiles').select('user_name,is_public').eq('id', currentUser.id).maybeSingle(); 
+    const { data: profile } = await supabase.from('profiles').select('user_name, show_email').eq('id', currentUser.id).maybeSingle(); 
     el('settingsName').value = profile?.user_name || currentUser.user_metadata?.user_name || ''; 
     el('settingsEmail').value = currentUser.email || ''; 
-    el('hideProfileCheckbox').checked = !(profile?.is_public ?? true); 
+    
+    // Устанавливаем радиокнопку в зависимости от настройки
+    if (profile?.show_email) {
+      el('privacy-email').checked = true;
+    } else {
+      el('privacy-name').checked = true;
+    }
+    
     el('newPassword').value = ''; 
     el('confirmPassword').value = ''; 
   }
@@ -215,13 +218,13 @@
     const newName = el('settingsName').value.trim(); 
     const newPassword = el('newPassword').value; 
     const confirmPassword = el('confirmPassword').value; 
-    const isPublic = !el('hideProfileCheckbox').checked; 
+    const showEmail = el('privacy-email').checked; // true - показывать email, false - показывать имя
     
     if(!newName){ showMessage('settingsMessage','Имя не может быть пустым'); return; } 
     if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } 
     if(newPassword && newPassword.length < 6){ showMessage('settingsMessage','Пароль должен быть минимум 6 символов'); return; }
 
-    const { error: pErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: newName, is_public: isPublic }], { onConflict: 'id' });
+    const { error: pErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: newName, show_email: showEmail }], { onConflict: 'id' });
     if(pErr){ showMessage('settingsMessage','Ошибка обновления профиля: ' + pErr.message); return; }
 
     let authErr = null;
@@ -238,7 +241,6 @@
     const timeStart = el('time-start').value; 
     const timeEnd = el('time-end').value; 
     const comment = el('bookingComment').value.trim(); 
-    const privacySetting = document.querySelector('input[name="privacy"]:checked').value;
     
     if(!date || !timeStart || !timeEnd){ showMessage('bookingMessage','Заполните все поля'); return; }
 
@@ -265,8 +267,7 @@
       start: start.toISOString(), 
       end: end.toISOString(), 
       room: 'Читальный зал', 
-      comment,
-      privacy_setting: privacySetting // сохраняем настройку приватности для этой брони
+      comment
     }]);
     
     if(error){ showMessage('bookingMessage','Ошибка при создании: ' + error.message, 'error'); console.error(error); return; }
@@ -311,18 +312,17 @@
         `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
       const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; 
       const title = `${escapeHtml(b.room || 'Читальный зал')}`;
-      const privacyBadge = b.privacy_setting ? `<span class="privacy-badge">${getPrivacyLabel(b.privacy_setting)}</span>` : '';
-      return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title} ${privacyBadge}</div><div class="booking-duration">${dateDisplay}</div><div><strong>Ваша бронь</strong></div>${commentHtml}</div>`;
+      return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div><div><strong>Ваша бронь</strong></div>${commentHtml}</div>`;
     }
     
-    // Для чужих броней учитываем настройки приватности
+    // Для чужих броней учитываем глобальную настройку приватности пользователя
     let displayName = 'Аноним';
-    const privacySetting = b.privacy_setting || 'public';
     
-    if (privacySetting === 'email' && b.profile_email) {
+    // Используем настройку из профиля пользователя
+    if (b.profile_show_email && b.profile_email) {
       displayName = b.profile_email;
-    } else if (privacySetting === 'public') {
-      displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || 'Аноним';
+    } else if (b.profile_user_name) {
+      displayName = b.profile_user_name;
     }
     
     const start = new Date(b.start); 
@@ -333,17 +333,7 @@
       `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
     const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; 
     const title = showName ? `${escapeHtml(displayName)} — ${escapeHtml(b.room || 'Читальный зал')}` : `${escapeHtml(b.room || 'Читальный зал')}`; 
-    const privacyBadge = privacySetting !== 'public' ? `<span class="privacy-badge">${getPrivacyLabel(privacySetting)}</span>` : '';
-    return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title} ${privacyBadge}</div><div class="booking-duration">${dateDisplay}</div>${commentHtml}</div>`; 
-  }
-
-  function getPrivacyLabel(setting) {
-    switch(setting) {
-      case 'public': return 'Имя';
-      case 'email': return 'Email';
-      case 'anonymous': return 'Аноним';
-      default: return 'Имя';
-    }
+    return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div>${commentHtml}</div>`; 
   }
 
   function attachClickListeners(bookings){ 
@@ -369,11 +359,11 @@
     if (isOwnBooking) {
       displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним';
     } else {
-      const privacySetting = b.privacy_setting || 'public';
-      if (privacySetting === 'email' && b.profile_email) {
+      // Используем настройку из профиля пользователя
+      if (b.profile_show_email && b.profile_email) {
         displayName = b.profile_email;
-      } else if (privacySetting === 'public') {
-        displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || 'Аноним';
+      } else if (b.profile_user_name) {
+        displayName = b.profile_user_name;
       }
     }
     
@@ -381,7 +371,6 @@
       `${start.toLocaleDateString('ru-RU')} с ${start.toLocaleTimeString('ru-RU')} до ${end.toLocaleTimeString('ru-RU')}` : 
       `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
     const commentHtml = b.comment ? `<p><strong>Комментарий:</strong> ${escapeHtml(b.comment)}</p>` : ''; 
-    const privacyInfo = isOwnBooking ? `<p><strong>Видимость:</strong> ${getPrivacyLabel(b.privacy_setting || 'public')}</p>` : '';
     const deleteBtn = isOwnBooking ? `<button class="modal-delete-btn" onclick="confirmDelete('${b.id}')">Удалить</button>` : ''; 
     
     info.innerHTML = `
@@ -389,7 +378,6 @@
       <p><strong>Комната:</strong> ${escapeHtml(b.room||'Читальный зал')}</p>
       <p><strong>Время:</strong> ${dateDisplay}</p>
       <p><strong>Забронировал:</strong> ${escapeHtml(displayName)}</p>
-      ${privacyInfo}
       ${commentHtml}
       ${deleteBtn}
     `; 
