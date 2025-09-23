@@ -465,39 +465,39 @@
         let isProfilePublic = true;
 
         async function checkUserAndRedirect() {
-          const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await supabase.auth.getUser();
         
-          if (user) {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select('is_admin, is_public, full_name')
-              .eq('id', user.id)
-              .maybeSingle();
-        
-            if (error) {
-              console.error('Ошибка чтения профиля:', error.message);
-              currentUser = user;
-              showBookingForm();
-              return;
-            }
-        
-            if (profile) {
-              currentUser = user;
-              currentUser.user_metadata.full_name = profile.full_name;
-              isProfilePublic = profile.is_public;
-              if (profile.is_admin) {
-                console.log("Администратор вошёл в систему. Перенаправление...");
-                window.location.href = '/admin.html';
-              } else {
-                showBookingForm();
-              }
+            if (user) {
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('is_admin, is_public, user_name')
+                    .eq('id', user.id)
+                    .maybeSingle();
+            
+                if (error) {
+                    console.error('Ошибка чтения профиля:', error.message);
+                    currentUser = user;
+                    showBookingForm();
+                    return;
+                }
+            
+                if (profile) {
+                    currentUser = user;
+                    currentUser.user_metadata.user_name = profile.user_name;
+                    isProfilePublic = profile.is_public;
+                    if (profile.is_admin) {
+                        console.log("Администратор вошёл в систему. Перенаправление...");
+                        window.location.href = '/admin.html';
+                    } else {
+                        showBookingForm();
+                    }
+                } else {
+                    currentUser = user;
+                    showBookingForm();
+                }
             } else {
-              currentUser = user;
-              showBookingForm();
+                showAuthForm();
             }
-          } else {
-            showAuthForm();
-          }
         }
         
         document.addEventListener('DOMContentLoaded', async function() {
@@ -549,7 +549,7 @@
                 password: password,
                 options: {
                     data: {
-                        full_name: name
+                        user_name: name
                     }
                 }
             });
@@ -647,27 +647,26 @@
             }
             
             const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('full_name, is_public')
-              .eq('id', currentUser.id)
-              .maybeSingle();
+                .from('profiles')
+                .select('user_name, is_public')
+                .eq('id', currentUser.id)
+                .maybeSingle();
 
             if (profileError) {
                 showMessage('bookingMessage', 'Ошибка при проверке настроек профиля: ' + profileError.message, 'error');
                 return;
             }
 
-            const displayName = profile?.full_name || currentUser.user_metadata?.full_name || 'Неизвестно';
+            const displayName = profile?.user_name || currentUser.user_metadata?.user_name || 'Неизвестно';
             const isPublic = profile?.is_public === true;
-            const displayEmail = isPublic ? currentUser.email : 'Анонимный пользователь';
+            const userEmail = isPublic ? currentUser.email : 'Анонимный пользователь';
 
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
                     user_id: currentUser.id,
-                    user_email: currentUser.email,
+                    user_email: userEmail,
                     display_name: displayName,
-                    display_email: displayEmail,
                     is_public: isPublic,
                     room: 'Читальный зал',
                     start: startTime.toISOString(),
@@ -767,12 +766,12 @@
                 const endTime = new Date(booking.end);
                 
                 const displayName = booking.display_name || 'Неизвестно';
-                const displayEmail = booking.is_public === false ? 'Анонимный пользователь' : (booking.user_email || 'Неизвестно');
+                const userEmail = booking.is_public === false ? 'Анонимный пользователь' : (booking.user_email || 'Неизвестно');
                 const commentHtml = booking.comment ? `<div class="booking-comment">${booking.comment}</div>` : '';
                 
                 return `
                     <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${displayName} (${displayEmail}) — ${booking.room}</div>
+                        <div class="booking-time">${displayName} (${userEmail}) — ${booking.room}</div>
                         <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
                         ${commentHtml}
                     </div>
@@ -857,16 +856,16 @@
         async function loadUserSettings() {
             if (currentUser) {
                 const { data: profile, error } = await supabase
-                  .from('profiles')
-                  .select('full_name, is_public')
-                  .eq('id', currentUser.id)
-                  .maybeSingle();
+                    .from('profiles')
+                    .select('user_name, is_public')
+                    .eq('id', currentUser.id)
+                    .maybeSingle();
                   
                 if (profile) {
-                    document.getElementById('settingsName').value = profile.full_name || '';
+                    document.getElementById('settingsName').value = profile.user_name || '';
                     document.getElementById('hideProfileCheckbox').checked = !profile.is_public;
                 } else {
-                    document.getElementById('settingsName').value = currentUser.user_metadata?.full_name || '';
+                    document.getElementById('settingsName').value = currentUser.user_metadata?.user_name || '';
                 }
                 
                 document.getElementById('settingsEmail').value = currentUser.email;
@@ -899,9 +898,9 @@
 
             try {
                 const { error: profileError } = await supabase
-                  .from('profiles')
-                  .update({ full_name: newName, is_public: isPublic })
-                  .eq('id', currentUser.id);
+                    .from('profiles')
+                    .update({ user_name: newName, is_public: isPublic })
+                    .eq('id', currentUser.id);
                   
                 if (profileError) {
                     showMessage('settingsMessage', 'Ошибка обновления профиля: ' + profileError.message, 'error');
