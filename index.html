@@ -293,17 +293,52 @@
   }
 
   async function loadAllBookings(){ 
-    const { data, error } = await supabase.from('bookings_with_profile').select('*').order('start', { ascending: true }); 
+    // Загружаем все брони вместе с профилями пользователей
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        profiles:user_id (
+          user_name,
+          email,
+          display_type
+        )
+      `)
+      .order('start', { ascending: true }); 
+    
     const node = el('allBookingsList'); 
-    if(error || !data || data.length === 0){ node.innerHTML = '<p>Броней пока нет</p>'; return; } 
-    node.innerHTML = data.map(b => bookingItemHtml(b, true)).join(''); 
-    attachClickListeners(data); 
+    if(error || !bookings || bookings.length === 0){ node.innerHTML = '<p>Броней пока нет</p>'; return; } 
+    
+    node.innerHTML = bookings.map(b => {
+      // Получаем данные профиля
+      const profile = b.profiles || {};
+      const displayType = profile.display_type || 'name';
+      
+      let displayName = 'Аноним';
+      if (displayType === 'email' && profile.email) {
+        displayName = profile.email;
+      } else if (profile.user_name) {
+        displayName = profile.user_name;
+      }
+      
+      const start = new Date(b.start); 
+      const end = new Date(b.end); 
+      const sameDay = start.toLocaleDateString('ru-RU') === end.toLocaleDateString('ru-RU'); 
+      const dateDisplay = sameDay ? 
+        `${start.toLocaleDateString('ru-RU')} c ${start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} до ${end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}` : 
+        `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
+      const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; 
+      const title = `${escapeHtml(displayName)} — ${escapeHtml(b.room || 'Читальный зал')}`;
+      
+      return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div>${commentHtml}</div>`;
+    }).join(''); 
+    
+    attachClickListeners(bookings); 
   }
 
   function bookingItemHtml(b, showName=true, isOwnBooking=false){ 
     // Для своих броней всегда показываем полную информацию
     if (isOwnBooking) {
-      const name = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним';
       const start = new Date(b.start); 
       const end = new Date(b.end); 
       const sameDay = start.toLocaleDateString('ru-RU') === end.toLocaleDateString('ru-RU'); 
@@ -315,24 +350,7 @@
       return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div><div><strong>Ваша бронь</strong></div>${commentHtml}</div>`;
     }
     
-    // Для чужих броней учитываем настройку display_type из профиля пользователя
-    let displayName = 'Аноним';
-    
-    if (b.profile_display_type === 'email' && b.profile_email) {
-      displayName = b.profile_email;
-    } else if (b.profile_user_name) {
-      displayName = b.profile_user_name;
-    }
-    
-    const start = new Date(b.start); 
-    const end = new Date(b.end); 
-    const sameDay = start.toLocaleDateString('ru-RU') === end.toLocaleDateString('ru-RU'); 
-    const dateDisplay = sameDay ? 
-      `${start.toLocaleDateString('ru-RU')} c ${start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} до ${end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}` : 
-      `${start.toLocaleDateString('ru-RU')} ${start.toLocaleTimeString('ru-RU')} - ${end.toLocaleDateString('ru-RU')} ${end.toLocaleTimeString('ru-RU')}`; 
-    const commentHtml = b.comment ? `<div class="booking-comment">${escapeHtml(b.comment)}</div>` : ''; 
-    const title = showName ? `${escapeHtml(displayName)} — ${escapeHtml(b.room || 'Читальный зал')}` : `${escapeHtml(b.room || 'Читальный зал')}`; 
-    return `<div class="booking-item" data-id="${b.id}"><div class="booking-time">${title}</div><div class="booking-duration">${dateDisplay}</div>${commentHtml}</div>`; 
+    return ''; // Этот код не должен выполняться
   }
 
   function attachClickListeners(bookings){ 
@@ -356,13 +374,18 @@
     
     let displayName = 'Аноним';
     if (isOwnBooking) {
-      displayName = b.public_name || b.display_name || b.booking_display_name || b.profile_user_name || b.profile_email || 'Аноним';
+      // Для своих броней показываем полную информацию
+      const { data: profile } = await supabase.from('profiles').select('user_name, email').eq('id', currentUser.id).maybeSingle();
+      displayName = profile?.user_name || currentUser.user_metadata?.user_name || currentUser.email || 'Аноним';
     } else {
-      // Используем настройку из профиля пользователя
-      if (b.profile_display_type === 'email' && b.profile_email) {
-        displayName = b.profile_email;
-      } else if (b.profile_user_name) {
-        displayName = b.profile_user_name;
+      // Для чужих броней используем настройки их профиля
+      const { data: profile } = await supabase.from('profiles').select('user_name, email, display_type').eq('id', b.user_id).maybeSingle();
+      const displayType = profile?.display_type || 'name';
+      
+      if (displayType === 'email' && profile?.email) {
+        displayName = profile.email;
+      } else if (profile?.user_name) {
+        displayName = profile.user_name;
       }
     }
     
