@@ -510,6 +510,13 @@
                 return;
             }
 
+            // Проверяем, занято ли время
+            const isTimeAvailable = await checkTimeAvailability(startTime, endTime);
+            if (!isTimeAvailable) {
+                showMessage('bookingMessage', 'На выбранное время уже есть бронь. Выберите другое время.', 'error');
+                return;
+            }
+
             const { error } = await supabase
                 .from('bookings')
                 .insert([{
@@ -526,6 +533,44 @@
                 showMessage('bookingMessage', 'Бронь создана успешно!', 'success');
                 loadUserBookings();
                 loadAllBookings();
+            }
+        }
+
+        async function checkTimeAvailability(newStartTime, newEndTime) {
+            try {
+                // Получаем все существующие брони
+                const { data: existingBookings, error } = await supabase
+                    .from('bookings')
+                    .select('start, end')
+                    .eq('room', 'Читальный зал');
+
+                if (error) {
+                    console.error('Ошибка при проверке доступности времени:', error);
+                    return true; // В случае ошибки разрешаем бронирование
+                }
+
+                if (!existingBookings || existingBookings.length === 0) {
+                    return true; // Нет существующих броней
+                }
+
+                // Проверяем пересечения с существующими бронями
+                for (const booking of existingBookings) {
+                    const existingStart = new Date(booking.start);
+                    const existingEnd = new Date(booking.end);
+
+                    // Проверяем пересечение времени
+                    if (
+                        (newStartTime < existingEnd && newEndTime > existingStart) ||
+                        (existingStart < newEndTime && existingEnd > newStartTime)
+                    ) {
+                        return false; // Время занято
+                    }
+                }
+
+                return true; // Время свободно
+            } catch (err) {
+                console.error('Ошибка при проверке доступности:', err);
+                return true; // В случае ошибки разрешаем бронирование
             }
         }
         
