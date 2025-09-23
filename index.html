@@ -472,7 +472,7 @@
               .from('profiles')
               .select('is_admin, is_public, full_name') // Добавили full_name
               .eq('id', user.id)
-              .single();
+              .maybeSingle();
         
             if (error) {
               console.error('Ошибка чтения профиля:', error.message);
