@@ -398,28 +398,39 @@
             }
         });
 
-        async function cleanupOldBookings() {
-            try {
-                const now = new Date();
-                const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        async function deleteBooking(bookingId) {
+    if (!currentUser) {
+        alert('Вы не авторизованы для удаления бронирования.');
+        return;
+    }
 
-                // Удаляем все брони, которые закончились более 24 часов назад
-                const { error, count } = await supabase
-                    .from('bookings')
-                    .delete()
-                    .lt('end', twentyFourHoursAgo.toISOString());
+    try {
+        const response = await fetch('/.netlify/functions/delete-booking', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ booking_id: bookingId })
+        });
 
-                if (error) {
-                    console.error('Ошибка при удалении старых броней:', error);
-                } else if (count > 0) {
-                    console.log(`Удалено ${count} старых броней`);
-                }
+        const result = await response.json();
 
-            } catch (error) {
-                console.error('Общая ошибка при очистке:', error);
-            }
+        if (!response.ok) {
+            throw new Error(result.error || 'Ошибка при удалении');
         }
 
+        alert('Бронь успешно удалена!');
+        document.getElementById('bookingModal').style.display = 'none';
+        
+        // Перезагружаем оба списка
+        await loadUserBookings();
+        await loadAllBookings();
+        
+    } catch (error) {
+        alert('Ошибка при удалении брони: ' + error.message);
+        console.error('Delete error:', error);
+    }
+}
         async function signUp() {
             const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
