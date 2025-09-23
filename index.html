@@ -383,6 +383,7 @@
         
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
+        let allBookings = [];
 
         document.addEventListener('DOMContentLoaded', async function() {
             const today = new Date().toISOString().split('T')[0];
@@ -392,45 +393,32 @@
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 currentUser = session.user;
-                // Удаляем старые брони при загрузке
                 await cleanupOldBookings();
                 showBookingForm();
             }
         });
 
-        async function deleteBooking(bookingId) {
-    if (!currentUser) {
-        alert('Вы не авторизованы для удаления бронирования.');
-        return;
-    }
+        async function cleanupOldBookings() {
+            try {
+                const now = new Date();
+                const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    try {
-        const response = await fetch('/.netlify/functions/delete-booking', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ booking_id: bookingId })
-        });
+                const { error, count } = await supabase
+                    .from('bookings')
+                    .delete()
+                    .lt('end', twentyFourHoursAgo.toISOString());
 
-        const result = await response.json();
+                if (error) {
+                    console.error('Ошибка при удалении старых броней:', error);
+                } else if (count > 0) {
+                    console.log(`Удалено ${count} старых броней`);
+                }
 
-        if (!response.ok) {
-            throw new Error(result.error || 'Ошибка при удалении');
+            } catch (error) {
+                console.error('Общая ошибка при очистке:', error);
+            }
         }
 
-        alert('Бронь успешно удалена!');
-        document.getElementById('bookingModal').style.display = 'none';
-        
-        // Перезагружаем оба списка
-        await loadUserBookings();
-        await loadAllBookings();
-        
-    } catch (error) {
-        alert('Ошибка при удалении брони: ' + error.message);
-        console.error('Delete error:', error);
-    }
-}
         async function signUp() {
             const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
@@ -521,7 +509,6 @@
             const startTime = new Date(date + 'T' + timeStart);
             let endTime = new Date(date + 'T' + timeEnd);
 
-            // Если время окончания меньше времени начала, значит бронь переходит на следующий день
             if (endTime <= startTime) {
                 endTime.setDate(endTime.getDate() + 1);
             }
@@ -533,19 +520,16 @@
 
             const durationHours = (endTime - startTime) / (1000 * 60 * 60);
             
-            // Проверяем, что бронь не превышает 4 часа
             if (durationHours > 4.01) {
                 showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
                 return;
             }
 
-            // Проверяем, что бронь не превышает 24 часа (защита от ошибок)
             if (durationHours > 24) {
                 showMessage('bookingMessage', 'Некорректное время бронирования', 'error');
                 return;
             }
 
-            // Проверяем, занято ли время
             const isTimeAvailable = await checkTimeAvailability(startTime, endTime);
             if (!isTimeAvailable) {
                 showMessage('bookingMessage', 'На выбранное время уже есть бронь. Выберите другое время.', 'error');
@@ -573,7 +557,6 @@
 
         async function checkTimeAvailability(newStartTime, newEndTime) {
             try {
-                // Получаем все существующие брони
                 const { data: existingBookings, error } = await supabase
                     .from('bookings')
                     .select('start, end')
@@ -581,31 +564,29 @@
 
                 if (error) {
                     console.error('Ошибка при проверке доступности времени:', error);
-                    return true; // В случае ошибки разрешаем бронирование
+                    return true;
                 }
 
                 if (!existingBookings || existingBookings.length === 0) {
-                    return true; // Нет существующих броней
+                    return true;
                 }
 
-                // Проверяем пересечения с существующими бронями
                 for (const booking of existingBookings) {
                     const existingStart = new Date(booking.start);
                     const existingEnd = new Date(booking.end);
 
-                    // Проверяем пересечение времени
                     if (
                         (newStartTime < existingEnd && newEndTime > existingStart) ||
                         (existingStart < newEndTime && existingEnd > newStartTime)
                     ) {
-                        return false; // Время занято
+                        return false;
                     }
                 }
 
-                return true; // Время свободно
+                return true;
             } catch (err) {
                 console.error('Ошибка при проверке доступности:', err);
-                return true; // В случае ошибки разрешаем бронирование
+                return true;
             }
         }
         
@@ -636,65 +617,52 @@
                 `;
             }).join('');
             
-            addClickListeners(bookings);
+            addClickListeners();
         }
 
         async function loadAllBookings() {
-    try {
-        const response = await fetch('/.netlify/functions/list-bookings');
-        const bookings = await response.json();
+            try {
+                const { data: bookings, error } = await supabase
+                    .from('bookings')
+                    .select('*')
+                    .order('start', { ascending: true });
 
-        const allBookingsList = document.getElementById('allBookingsList');
-        
-        if (!bookings || bookings.length === 0) {
-            allBookingsList.innerHTML = '<p>Броней пока нет</p>';
-            return;
-        }
+                const allBookingsList = document.getElementById('allBookingsList');
+                
+                if (error || !bookings || bookings.length === 0) {
+                    allBookingsList.innerHTML = '<p>Броней пока нет</p>';
+                    allBookings = [];
+                    return;
+                }
 
-        allBookingsList.innerHTML = bookings.map(booking => {
-            const startTime = new Date(booking.start);
-            const endTime = new Date(booking.end);
-            
-            // Показываем только email
-            const displayName = booking.user_email || 'Неизвестно';
-            
-            return `
-                <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                    <div class="booking-time">${displayName} — ${booking.room}</div>
-                    <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
-                </div>
-            `;
-        }).join('');
-        
-        addClickListeners(bookings);
-    } catch (error) {
-        console.error('Error loading all bookings:', error);
-        document.getElementById('allBookingsList').innerHTML = '<p>Ошибка загрузки броней</p>';
-    }
-}
-            allBookingsList.innerHTML = bookings.map(booking => {
-                const startTime = new Date(booking.start);
-                const endTime = new Date(booking.end);
+                allBookings = bookings;
                 
-                // Показываем только email
-                const displayName = booking.user_email || 'Неизвестно';
+                allBookingsList.innerHTML = bookings.map(booking => {
+                    const startTime = new Date(booking.start);
+                    const endTime = new Date(booking.end);
+                    
+                    const displayName = booking.user_email || 'Неизвестно';
+                    
+                    return `
+                        <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
+                            <div class="booking-time">${displayName} — ${booking.room}</div>
+                            <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                        </div>
+                    `;
+                }).join('');
                 
-                return `
-                    <div class="booking-item" style="border-left: 4px solid #764ba2;" data-id="${booking.id}" data-user-id="${booking.user_id}">
-                        <div class="booking-time">${displayName} — ${booking.room}</div>
-                        <div class="booking-duration">${startTime.toLocaleDateString('ru-RU')} c ${startTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})} до ${endTime.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
-                    </div>
-                `;
-            }).join('');
-            
-            addClickListeners(bookings);
+                addClickListeners();
+            } catch (error) {
+                console.error('Error loading all bookings:', error);
+                document.getElementById('allBookingsList').innerHTML = '<p>Ошибка загрузки броней</p>';
+            }
         }
         
-        function addClickListeners(bookings) {
+        function addClickListeners() {
             document.querySelectorAll('.booking-item').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const bookingId = e.currentTarget.getAttribute('data-id');
-                    const booking = bookings.find(b => b.id == bookingId);
+                    const booking = allBookings.find(b => b.id == bookingId);
                     if (booking) {
                         showBookingDetails(booking);
                     }
@@ -702,11 +670,10 @@
             });
         }
         
-        async function showBookingDetails(booking) {
+        function showBookingDetails(booking) {
             const modal = document.getElementById('bookingModal');
             const modalInfo = document.getElementById('modalInfo');
             
-            // Показываем только email
             const userEmail = booking.user_email || 'Не указан';
 
             let deleteButtonHTML = '';
@@ -738,19 +705,29 @@
                 return;
             }
 
-            const { error } = await supabase
-                .from('bookings')
-                .delete()
-                .eq('id', bookingId)
-                .eq('user_id', currentUser.id);
+            try {
+                const { error } = await supabase
+                    .from('bookings')
+                    .delete()
+                    .eq('id', bookingId)
+                    .eq('user_id', currentUser.id);
 
-            if (error) {
-                alert('Ошибка при удалении брони: ' + error.message);
-            } else {
+                if (error) {
+                    console.error('Delete error:', error);
+                    alert('Ошибка при удалении брони: ' + error.message);
+                    return;
+                }
+
                 alert('Бронь успешно удалена!');
                 document.getElementById('bookingModal').style.display = 'none';
-                loadUserBookings();
-                loadAllBookings();
+                
+                // Перезагружаем списки
+                await loadUserBookings();
+                await loadAllBookings();
+                
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Ошибка при удалении брони: ' + error.message);
             }
         }
 
