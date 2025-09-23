@@ -470,9 +470,9 @@
           if (user) {
             const { data: profile, error } = await supabase
               .from('profiles')
-              .select('is_admin, is_public, full_name') // Добавили full_name
+              .select('is_admin, is_public, full_name')
               .eq('id', user.id)
-              .maybeSingle();
+              .maybeSingle(); // <-- ИСПРАВЛЕНИЕ: изменили .single() на .maybeSingle()
         
             if (error) {
               console.error('Ошибка чтения профиля:', error.message);
@@ -483,7 +483,7 @@
         
             if (profile) {
               currentUser = user;
-              currentUser.user_metadata.full_name = profile.full_name; // Обновляем имя
+              currentUser.user_metadata.full_name = profile.full_name;
               isProfilePublic = profile.is_public;
               if (profile.is_admin) {
                 console.log("Администратор вошёл в систему. Перенаправление...");
@@ -650,15 +650,15 @@
               .from('profiles')
               .select('full_name, is_public')
               .eq('id', currentUser.id)
-              .single();
+              .maybeSingle(); // <-- ИСПРАВЛЕНИЕ: изменили .single() на .maybeSingle()
 
             if (profileError) {
                 showMessage('bookingMessage', 'Ошибка при проверке настроек профиля: ' + profileError.message, 'error');
                 return;
             }
 
-            const displayName = profile.full_name || currentUser.user_metadata?.full_name || 'Неизвестно';
-            const displayEmail = profile.is_public ? currentUser.email : 'Анонимный пользователь';
+            const displayName = profile?.full_name || currentUser.user_metadata?.full_name || 'Неизвестно';
+            const displayEmail = profile?.is_public ? currentUser.email : 'Анонимный пользователь';
 
             const { error } = await supabase
                 .from('bookings')
@@ -858,7 +858,7 @@
                   .from('profiles')
                   .select('full_name, is_public')
                   .eq('id', currentUser.id)
-                  .single();
+                  .maybeSingle(); // <-- ИСПРАВЛЕНИЕ: изменили .single() на .maybeSingle()
                   
                 if (profile) {
                     document.getElementById('settingsName').value = profile.full_name || '';
