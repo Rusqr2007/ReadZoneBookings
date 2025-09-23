@@ -419,8 +419,8 @@ async function checkUserAndRedirect() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('bookingDate').value = today;
             document.getElementById('bookingDate').min = today;
+            document.getElementById('bookingDate').max = today; // Ограничиваем выбор будущих дат
             
-            // Запускаем новую функцию для проверки пользователя и перенаправления
             await cleanupOldBookings();
             await checkUserAndRedirect();
         });
@@ -494,7 +494,6 @@ async function checkUserAndRedirect() {
             if (error) {
                 showMessage('authMessage', error.message, 'error');
             } else {
-                // --- ВЫЗЫВАЕМ НОВУЮ ФУНКЦИЮ ПОСЛЕ УСПЕШНОГО ВХОДА ---
                 showMessage('authMessage', 'Вход выполнен!', 'success');
                 setTimeout(checkUserAndRedirect, 1000);
             }
@@ -533,10 +532,12 @@ async function checkUserAndRedirect() {
             }
             
             const startTime = new Date(date + 'T' + timeStart);
-            let endTime = new Date(date + 'T' + timeEnd);
+            const endTime = new Date(date + 'T' + timeEnd);
 
+            // Проверка, что время окончания позже времени начала в рамках одного дня
             if (endTime <= startTime) {
-                endTime.setDate(endTime.getDate() + 1);
+                showMessage('bookingMessage', 'Время окончания должно быть позже времени начала', 'error');
+                return;
             }
 
             if (isNaN(startTime) || isNaN(endTime)) {
@@ -550,12 +551,7 @@ async function checkUserAndRedirect() {
                 showMessage('bookingMessage', 'Максимальная длительность брони — 4 часа', 'error');
                 return;
             }
-
-            if (durationHours > 24) {
-                showMessage('bookingMessage', 'Некорректное время бронирования', 'error');
-                return;
-            }
-
+            
             const isTimeAvailable = await checkTimeAvailability(startTime, endTime);
             if (!isTimeAvailable) {
                 showMessage('bookingMessage', 'На выбранное время уже есть бронь. Выберите другое время.', 'error');
@@ -583,10 +579,13 @@ async function checkUserAndRedirect() {
 
         async function checkTimeAvailability(newStartTime, newEndTime) {
             try {
+                const date = newStartTime.toISOString().split('T')[0];
                 const { data: existingBookings, error } = await supabase
                     .from('bookings')
                     .select('start, end')
-                    .eq('room', 'Читальный зал');
+                    .eq('room', 'Читальный зал')
+                    .gte('start', date + 'T00:00:00.000Z') // Выбираем бронирования только на текущий день
+                    .lte('start', date + 'T23:59:59.999Z');
 
                 if (error) {
                     console.error('Ошибка при проверке доступности времени:', error);
@@ -602,8 +601,7 @@ async function checkUserAndRedirect() {
                     const existingEnd = new Date(booking.end);
 
                     if (
-                        (newStartTime < existingEnd && newEndTime > existingStart) ||
-                        (existingStart < newEndTime && existingEnd > newStartTime)
+                        (newStartTime < existingEnd && newEndTime > existingStart)
                     ) {
                         return false;
                     }
