@@ -470,7 +470,7 @@
           if (user) {
             const { data: profile, error } = await supabase
               .from('profiles')
-              .select('is_admin, is_public')
+              .select('is_admin, is_public, full_name') // Добавили full_name
               .eq('id', user.id)
               .single();
         
@@ -483,6 +483,7 @@
         
             if (profile) {
               currentUser = user;
+              currentUser.user_metadata.full_name = profile.full_name; // Обновляем имя
               isProfilePublic = profile.is_public;
               if (profile.is_admin) {
                 console.log("Администратор вошёл в систему. Перенаправление...");
@@ -656,7 +657,7 @@
                 return;
             }
 
-            const displayName = profile.full_name || currentUser.email;
+            const displayName = profile.full_name || currentUser.user_metadata?.full_name || 'Неизвестно';
             const displayEmail = profile.is_public ? currentUser.email : 'Анонимный пользователь';
 
             const { error } = await supabase
