@@ -6,12 +6,9 @@
   <title>Админ — ReadZoneBookings</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    :root{
-      --bg:#f6f8fb; --card:#fff; --accent1:#6a11cb; --accent2:#2575fc;
-      --muted:#6b7280; --radius:12px;
-    }
+    :root{--bg:#f6f8fb;--card:#fff;--accent1:#6a11cb;--accent2:#2575fc;--muted:#6b7280;--radius:12px}
     body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);margin:0;padding:28px;color:#111}
-    .wrap{max-width:1200px;margin:0 auto}
+    .wrap{max-width:1100px;margin:0 auto}
     .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
     .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:0 12px 40px rgba(10,20,30,.06)}
     h1{margin:0;color:var(--accent1)}
@@ -24,7 +21,6 @@
     th{background:#fafafa;font-weight:600}
     tr:hover{background:#fbfdff}
     .small{font-size:13px;color:var(--muted)}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:#f3f5ff;color:var(--accent1);font-weight:600}
     .actions button{margin-right:6px}
     @media (max-width:900px){ .controls{flex-direction:column;align-items:stretch} .top{flex-direction:column;align-items:flex-start} }
   </style>
@@ -42,9 +38,9 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="controlsCard">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div style="min-width:240px">
+        <div style="min-width:220px">
           <label class="small">Фильтр по комнате</label><br>
           <select id="roomFilter"><option value="">Все комнаты</option></select>
         </div>
@@ -55,8 +51,8 @@
         </div>
 
         <div style="flex:1;min-width:220px">
-          <label class="small">Поиск (email / id)</label><br>
-          <input id="q" type="search" placeholder="Поиск по email или id..." />
+          <label class="small">Поиск (email / id / комната)</label><br>
+          <input id="q" type="search" placeholder="Поиск по email, id или комнате..." />
         </div>
 
         <div style="display:flex;gap:8px;align-items:flex-end">
@@ -96,82 +92,38 @@
   </div>
 
 <script>
-/* ==========================
-   ВСТАВЬ свои данные SUPABASE
-   ========================== */
+/* ====== ВСТАВЬ СВОИ ДАННЫЕ (если нужно поменять) ====== */
 const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
-/* ========================== */
+/* ====================================================== */
 
 const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-<script>
-  const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
-  const SUPABASE_ANON_KEY = "…твой anon key…";
-  const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // --- вставляем код сюда ---
-  async function checkAdminAndRedirect() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return; // не вошёл
-
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user.id)
-        .single();
-
-      if (error) {
-        console.error("Ошибка чтения профиля:", error);
-        return;
-      }
-
-      if (profile && profile.is_admin) {
-        window.location.replace("/admin.html"); // редирект
-      }
-    } catch (e) {
-      console.error("checkAdminAndRedirect error", e);
-    }
-  }
-
-  // проверяем сразу и при входе
-  checkAdminAndRedirect();
-  supabase.auth.onAuthStateChange((_event, session) => {
-    if (session) checkAdminAndRedirect();
-  });
-</script>
 
 let currentUser = null;
 let isAdmin = false;
-let bookingsCache = []; // local cache
+let bookingsCache = [];
 
-// --- helpers
-function $(id){ return document.getElementById(id); }
+// helpers
+const $ = id => document.getElementById(id);
+function escapeHtml(s){ if (s==null) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function formatDate(d){ return d.toLocaleDateString(); }
 function formatTimeRange(s,e){ return `${s.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} — ${e.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`; }
 function csvEscape(v){ if(v==null) return ''; return `"${String(v).replace(/"/g,'""')}"`; }
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 
-// --- init
-async function initAdmin() {
-  // get user
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !user) {
-    alert('Сначала войдите в систему.');
-    location.href = '/';
-    return;
-  }
+// init
+async function initAdmin(){
+  // get current user
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) { alert('Сначала войдите в систему.'); location.href = '/'; return; }
   currentUser = user;
   $('userBlock').textContent = `${user.email} · id: ${user.id}`;
 
-  // check profiles table for is_admin (RLS must allow user to read their own profile)
+  // read is_admin from profiles (RLS must allow read)
   try {
     const { data: profile, error: profErr } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
-    if (profErr) {
-      console.warn('Profile fetch error (may be RLS):', profErr.message);
-      isAdmin = false;
-    } else {
-      isAdmin = profile?.is_admin === true;
-    }
+    if (profErr) { console.warn('Profile fetch error (RLS?)', profErr.message); isAdmin = false; }
+    else { isAdmin = profile?.is_admin === true; }
   } catch(e){ console.error(e); isAdmin = false; }
 
   // wire UI
@@ -182,39 +134,30 @@ async function initAdmin() {
   $('dateFilter').addEventListener('change', loadAndRender);
   $('exportCsv').addEventListener('click', exportCSV);
 
-  // realtime subscription to bookings table
+  // realtime
   supabase.channel('realtime-bookings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
-      // console.log('realtime', payload);
-      loadAndRender(); // refresh on any change
-    })
-    .subscribe();
+      loadAndRender();
+    }).subscribe();
 
   // initial load
   await loadAndRender();
-  await loadProfiles(); // optional
+  await loadProfiles();
 }
 
-// --- load bookings from supabase
-async function loadBookings() {
+// load bookings
+async function loadBookings(){
   const { data, error } = await supabase
     .from('bookings')
     .select('id, room, start, end, user_email, user_id')
     .order('start', { ascending: true });
 
-  if (error) {
-    console.error('loadBookings error', error);
-    bookingsCache = [];
-    return;
-  }
-  // normalize dates
-  bookingsCache = (data || []).map(b => {
-    return { ...b, start: new Date(b.start), end: new Date(b.end) };
-  });
+  if (error) { console.error('loadBookings error', error); bookingsCache = []; return; }
+  bookingsCache = (data || []).map(b => ({ ...b, start: new Date(b.start), end: new Date(b.end) }));
 }
 
-// --- render with filters
-async function loadAndRender() {
+// render
+async function loadAndRender(){
   $('stats').textContent = 'Загрузка...';
   await loadBookings();
   populateRoomFilter();
@@ -223,7 +166,7 @@ async function loadAndRender() {
 }
 
 function populateRoomFilter(){
-  const rooms = Array.from(new Set(bookingsCache.map(b => b.room).filter(Boolean)));
+  const rooms = Array.from(new Set(bookingsCache.map(b=>b.room).filter(Boolean)));
   const sel = $('roomFilter');
   const cur = sel.value || '';
   sel.innerHTML = '<option value="">Все комнаты</option>';
@@ -235,101 +178,85 @@ function populateRoomFilter(){
   });
 }
 
-function renderBookings() {
+function renderBookings(){
   const tbody = document.querySelector('#bookingsTable tbody');
   tbody.innerHTML = '';
   const q = $('q').value.trim().toLowerCase();
   const roomFilter = $('roomFilter').value;
-  const dateFilter = $('dateFilter').value; // yyyy-mm-dd
+  const dateFilter = $('dateFilter').value;
 
   let list = bookingsCache.slice();
-
   if (roomFilter) list = list.filter(b => b.room === roomFilter);
   if (dateFilter) list = list.filter(b => b.start.toISOString().slice(0,10) === dateFilter);
   if (q) list = list.filter(b => ((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
 
-  if (list.length === 0) {
+  if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="6" class="muted">Броней не найдено по фильтрам.</td></tr>`;
     return;
   }
 
   list.forEach(b => {
-    const canDelete = (currentUser && (currentUser.id === b.user_id || isAdmin));
+    const canDelete = (currentUser && (String(currentUser.id) === String(b.user_id) || isAdmin));
     const deleteBtn = canDelete ? `<button onclick="confirmDelete('${b.id}')">Удалить</button>` : '';
-    tbody.insertAdjacentHTML('beforeend', `
-      <tr>
-        <td style="min-width:200px">${b.id}</td>
-        <td>${escapeHtml(b.room)}</td>
-        <td>${formatDate(b.start)}</td>
-        <td>${formatTimeRange(b.start, b.end)}</td>
-        <td>${escapeHtml(b.user_email || b.user_id)}</td>
-        <td class="actions">${deleteBtn}</td>
-      </tr>`);
+    const row = `<tr>
+      <td style="min-width:200px">${escapeHtml(b.id)}</td>
+      <td>${escapeHtml(b.room)}</td>
+      <td>${formatDate(b.start)}</td>
+      <td>${formatTimeRange(b.start,b.end)}</td>
+      <td>${escapeHtml(b.user_email || b.user_id || '—')}</td>
+      <td class="actions">${deleteBtn}</td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', row);
   });
 }
 
-// --- delete with confirmation
+// delete
 function confirmDelete(id){
-  if (!confirm('Вы уверены? Удаление необратимо.')) return;
+  if (!confirm('Удалить бронь?')) return;
   deleteBooking(id);
 }
-
 async function deleteBooking(id){
   try{
-    const { error } = await supabase.from('bookings').delete().eq('id', id);
+    const { error, data } = await supabase.from('bookings').delete().eq('id', id);
     if (error) throw error;
-    alert('Бронь удалена');
     await loadAndRender();
+    alert('Бронь удалена');
   } catch(err){
     console.error('delete error', err);
     alert('Не удалось удалить: ' + (err.message || JSON.stringify(err)));
   }
 }
 
-// --- export current view to CSV
+// export CSV
 function exportCSV(){
+  let list = bookingsCache.slice();
   const q = $('q').value.trim().toLowerCase();
   const roomFilter = $('roomFilter').value;
   const dateFilter = $('dateFilter').value;
-  let list = bookingsCache.slice();
   if (roomFilter) list = list.filter(b => b.room === roomFilter);
   if (dateFilter) list = list.filter(b => b.start.toISOString().slice(0,10) === dateFilter);
   if (q) list = list.filter(b => ((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
 
   if (!list.length) { alert('Нечего экспортировать'); return; }
-
   const header = ['id','room','date','start','end','user_email','user_id'];
   const rows = [ header.join(',') ];
-  list.forEach(r => {
-    rows.push([r.id, r.room, r.start.toISOString().slice(0,10), r.start.toISOString(), r.end.toISOString(), r.user_email||'', r.user_id||''].map(csvEscape).join(','));
-  });
+  list.forEach(r => rows.push([r.id, r.room, r.start.toISOString().slice(0,10), r.start.toISOString(), r.end.toISOString(), r.user_email||'', r.user_id||''].map(csvEscape).join(',')));
   const csv = rows.join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'bookings_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'bookings_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-// --- load profiles (optional) — may be blocked by RLS
+// load profiles (optional)
 async function loadProfiles(){
   try{
     const { data, error } = await supabase.from('profiles').select('id, full_name, is_admin').order('created_at', { ascending: true });
-    if (error) {
-      console.warn('profiles not readable by anon user (RLS)', error.message);
-      document.querySelector('#profilesTable tbody').innerHTML = `<tr><td colspan="3" class="muted">Profiles не доступны для просмотра (RLS).</td></tr>`;
-      return;
-    }
-    const tbody = document.querySelector('#profilesTable tbody');
-    tbody.innerHTML = '';
-    data.forEach(p => tbody.insertAdjacentHTML('beforeend', `<tr><td>${p.id}</td><td>${escapeHtml(p.full_name)}</td><td>${p.is_admin ? 'yes' : 'no'}</td></tr>`));
-  }catch(e){ console.error(e); }
+    if (error) { console.warn('profiles not readable', error.message); document.querySelector('#profilesTable tbody').innerHTML = `<tr><td colspan="3" class="muted">Profiles недоступны (RLS).</td></tr>`; return; }
+    const tbody = document.querySelector('#profilesTable tbody'); tbody.innerHTML = '';
+    data.forEach(p => tbody.insertAdjacentHTML('beforeend', `<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.full_name)}</td><td>${p.is_admin ? 'yes' : 'no'}</td></tr>`));
+  }catch(e){ console.error(e); document.querySelector('#profilesTable tbody').innerHTML = `<tr><td colspan="3" class="muted">Ошибка загрузки profiles</td></tr>`; }
 }
 
-// --- util
-function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
-function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-
-// init on load
+// start
 initAdmin();
 </script>
 </body>
