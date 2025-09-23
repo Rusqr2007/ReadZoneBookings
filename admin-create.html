@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Создание админа</title>
+    <style>
+        :root {
+            --primary-color: #6a11cb;
+            --secondary-color: #2575fc;
+            --background-color: #f6f8fb;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --border-radius: 16px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: var(--card-background);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #statusMessage {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Создание админ-аккаунта</h2>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="Введите email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" placeholder="Введите пароль" required>
+        </div>
+        <button id="createAdminBtn">Создать администратора</button>
+        <div id="statusMessage"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+        const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co'; // Замените на ваш URL
+        const SUPABASE_SERVICE_ROLE_KEY = 'YOUR_SUPABASE_SERVICE_ROLE_KEY'; // **ВНИМАНИЕ: Это ваш секретный ключ!**
+
+        const createAdminBtn = document.getElementById('createAdminBtn');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Создаем клиент Supabase с service_role ключом
+        const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+            }
+        });
+
+        createAdminBtn.addEventListener('click', async () => {
+            const email = emailInput.value;
+            const password = passwordInput.value;
+
+            if (!email || !password) {
+                showMessage('error', 'Пожалуйста, заполните все поля.');
+                return;
+            }
+
+            // Используем метод 'admin.createUser' для создания пользователя
+            const { data, error } = await supabase.auth.admin.createUser({
+                email: email,
+                password: password,
+                user_metadata: { is_admin: true } // Устанавливаем роль администратора
+            });
+
+            if (error) {
+                showMessage('error', `Ошибка: ${error.message}`);
+            } else {
+                showMessage('success', `Администратор ${data.user.email} успешно создан!`);
+            }
+        });
+
+        function showMessage(type, message) {
+            statusMessage.className = type;
+            statusMessage.textContent = message;
+        }
+    </script>
+</body>
+</html>
