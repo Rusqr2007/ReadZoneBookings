@@ -104,6 +104,42 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* ========================== */
 
 const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script>
+  const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
+  const SUPABASE_ANON_KEY = "…твой anon key…";
+  const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // --- вставляем код сюда ---
+  async function checkAdminAndRedirect() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return; // не вошёл
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Ошибка чтения профиля:", error);
+        return;
+      }
+
+      if (profile && profile.is_admin) {
+        window.location.replace("/admin.html"); // редирект
+      }
+    } catch (e) {
+      console.error("checkAdminAndRedirect error", e);
+    }
+  }
+
+  // проверяем сразу и при входе
+  checkAdminAndRedirect();
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (session) checkAdminAndRedirect();
+  });
+</script>
 
 let currentUser = null;
 let isAdmin = false;
