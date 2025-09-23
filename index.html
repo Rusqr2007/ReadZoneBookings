@@ -378,31 +378,42 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM';
-        
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        let currentUser = null;
-        
-        // --- НОВАЯ ФУНКЦИЯ ДЛЯ ПРОВЕРКИ И ПЕРЕНАПРАВЛЕНИЯ ---
-        async function checkUserAndRedirect() {
-            const { data: { user } } = await supabase.auth.getUser();
+const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM';
 
-            if (user) {
-                // Если у пользователя есть метаданные и в них есть поле is_admin = true
-                if (user.user_metadata && user.user_metadata.is_admin) {
-                    console.log("Администратор вошёл в систему. Перенаправление...");
-                    window.location.href = '/admin.html';
-                } else {
-                    // Обычный пользователь, показываем форму бронирования
-                    currentUser = user;
-                    showBookingForm();
-                }
-            } else {
-                // Пользователь не авторизован, показываем форму входа
-                showAuthForm();
-            }
-        }
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+
+async function checkUserAndRedirect() {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    // Читаем профиль в таблице profiles
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Ошибка чтения профиля:', error.message);
+      currentUser = user;
+      showBookingForm();
+      return;
+    }
+
+    if (profile && profile.is_admin) {
+      console.log("Администратор вошёл в систему. Перенаправление...");
+      window.location.href = '/admin.html';
+    } else {
+      currentUser = user;
+      showBookingForm();
+    }
+  } else {
+    showAuthForm();
+  }
+}
+
         
         document.addEventListener('DOMContentLoaded', async function() {
             const today = new Date().toISOString().split('T')[0];
