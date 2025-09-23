@@ -3,150 +3,363 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Admin Debug — ReadZoneBookings</title>
+<title>Админ — ReadZoneBookings</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
-  body{font-family:Inter,system-ui,Arial;padding:18px;background:#f6f8fb;color:#111}
-  .wrap{max-width:1100px;margin:0 auto}
-  .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.06)}
-  h1{margin:0 0 8px;color:#2563eb}
-  pre{background:#0b1220;color:#e6f1ff;padding:12px;border-radius:8px;overflow:auto;max-height:360px}
-  button{padding:8px 12px;border-radius:8px;border:0;background:#2563eb;color:#fff;cursor:pointer;margin-right:8px}
-  button.ghost{background:#fff;border:1px solid #e6eef2;color:#111}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-  label.small{font-size:13px;color:#666}
-  table{width:100%;border-collapse:collapse;margin-top:8px}
-  th,td{padding:8px;border-bottom:1px solid #eee}
+  :root{--bg:#f6f8fb;--card:#fff;--accent:#6a11cb;--danger:#ef4444;--muted:#6b7280;--radius:12px}
+  body{margin:0;background:var(--bg);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;padding:20px;color:#111}
+  .wrap{max-width:1200px;margin:0 auto}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+  .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.06)}
+  h1{margin:0;color:var(--accent)}
+  .muted{color:var(--muted);font-size:13px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  input[type="search"], select, input[type="date"], button{padding:10px;border-radius:10px;border:1px solid #e6eef2;font-size:14px}
+  button.primary{background:linear-gradient(90deg,var(--accent),#4f46e5);color:white;border:0;cursor:pointer}
+  button.ghost{background:#fff;color:#111;border:1px solid #e6eef2}
+  button.danger{background:var(--danger);color:#fff;border:0;cursor:pointer}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+  th{background:#fafafa;font-weight:600}
+  tr:hover{background:#fbfdff}
+  .actions button{margin-right:6px}
+  .small{font-size:13px;color:var(--muted)}
+  #toast{position:fixed;right:18px;bottom:18px;padding:10px 14px;border-radius:10px;background:#111;color:#fff;display:none;z-index:999}
+  #log{margin-top:12px;font-size:13px;color:#444;white-space:pre-wrap}
+  @media (max-width:900px){ .top{flex-direction:column;align-items:flex-start} .controls{flex-direction:column} }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <h1>Admin — Diagnostics</h1>
-    <div class="small">Этот экран покажет почему админ-панель пустая. Нажми <b>Run diagnostics</b> и скопируй вывод сюда.</div>
-    <div style="margin-top:10px" class="row">
-      <button id="runDiag">Run diagnostics</button>
-      <button id="loadBookings" class="ghost">Загрузить брони</button>
-      <button id="loadProfiles" class="ghost">Загрузить profiles</button>
-      <button id="testDelete" class="ghost">Попробовать удалить 1 бронь (тест)</button>
-      <button id="logout" class="ghost">Sign out</button>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>Админ-панель — ReadZoneBookings</h1>
+        <div class="muted">Просмотр: все брони. Удаление: владелец или админ.</div>
+      </div>
+      <div style="text-align:right">
+        <div id="userBlock" class="muted">Загрузка профиля...</div>
+        <div style="margin-top:8px"><button id="btnLogout" class="ghost">Sign out</button></div>
+      </div>
     </div>
 
-    <div style="margin-top:12px">
-      <label class="small">Supabase URL / ANON key (проверь)</label>
-      <div id="keys" style="font-size:13px;color:#333;word-break:break-all"></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="min-width:200px">
+          <label class="small">Фильтр по комнате</label><br>
+          <select id="roomFilter"><option value="">Все комнаты</option></select>
+        </div>
+
+        <div>
+          <label class="small">Дата</label><br>
+          <input id="dateFilter" type="date" />
+        </div>
+
+        <div style="flex:1;min-width:220px">
+          <label class="small">Поиск (email / id / комната)</label><br>
+          <input id="q" type="search" placeholder="Поиск по email, id или комнате..." />
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <button id="exportCsv" class="primary">Экспорт CSV</button>
+          <button id="clearFilters" class="ghost">Сброс</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+        <div id="stats" class="small">Загрузка…</div>
+        <div>
+          <button id="deleteSelectedBtn" class="danger" style="display:none">Удалить выбранные</button>
+          <button id="deleteAllBtn" class="danger" style="display:none;margin-left:8px">Удалить ВСЕ (ADMINS)</button>
+        </div>
+      </div>
+
+      <div id="tableWrap" style="overflow:auto;margin-top:12px">
+        <table id="bookingsTable" aria-live="polite">
+          <thead>
+            <tr>
+              <th style="width:34px"><input id="checkAll" type="checkbox" aria-label="Выбрать все" /></th>
+              <th>ID</th><th>Комната</th><th>Дата</th><th>Время</th><th>Пользователь (email)</th><th>Действия</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="log" class="muted"></div>
     </div>
-
-    <h3 style="margin-top:12px">Live output</h3>
-    <pre id="out">Нажмите Run diagnostics...</pre>
-
-    <h3 style="margin-top:12px">Краткая таблица бронирований (если загрузятся)</h3>
-    <div id="tableWrap"></div>
   </div>
-</div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-/* ====== ВСТАВЬ СВОИ (если нужно) ====== */
+/* === ВСТАВЬ СВОИ ЗНАЧЕНИЯ ЕСЛИ НУЖНО === */
 const SUPABASE_URL = "https://ufdpcktbgazzrqzqxxhf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1Mjc4MzIsImV4cCI6MjA3NDEwMzgzMn0.GT3YDB3pKZyDqTX-I3dkZQb4xpWP8xK9bhMgFnaZhsM";
-/* ===================================== */
+/* ======================================== */
 
 const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const out = id => document.getElementById(id);
-function logln(s){ const p = out('out'); p.textContent += '\\n' + s; p.scrollTop = p.scrollHeight; }
-function clearOut(){ out('out').textContent = ''; out('tableWrap').innerHTML = ''; }
+let currentUser = null;
+let isAdmin = false;
+let bookingsCache = [];
+let selectedIds = new Set();
 
-document.getElementById('keys').textContent = SUPABASE_URL + ' — ' + (SUPABASE_ANON_KEY ? ('ANON (len '+SUPABASE_ANON_KEY.length+')') : 'NO_KEY');
+const $ = id => document.getElementById(id);
+function toast(msg, t=3000){ const el=$('toast'); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none', t); }
+function log(s){ const el=$('log'); el.textContent = s; }
+function appendLog(s){ const el=$('log'); el.textContent = (el.textContent?el.textContent + '\n' : '') + s; }
 
-async function runDiagnostics(){
-  clearOut();
-  logln('=== Diagnostics started: ' + new Date().toLocaleString() + ' ===');
-
-  // 1) session
-  try{
-    const sessionRes = await supabase.auth.getSession();
-    logln('[session] getSession() => ' + JSON.stringify(sessionRes, null, 2));
-  } catch(e){ logln('[session] ERROR: ' + e.message); }
-
-  // 2) user
-  try{
-    const { data: { user }, error } = await supabase.auth.getUser();
-    logln('[user] getUser() => ' + (error ? ('ERROR: '+ error.message) : JSON.stringify(user, null, 2)));
-    if (!user) { logln('>>> Пользователь не авторизован. Выйди и войди снова.'); }
-  } catch(e){ logln('[user] ERROR: ' + e.message); }
-
-  // 3) try select bookings
-  try{
-    logln('[bookings] trying select * from public.bookings (limit 10)');
-    const { data, error } = await supabase.from('bookings').select('*').order('created_at',{ascending:false}).limit(10);
-    logln('[bookings] response error: ' + (error ? JSON.stringify(error) : 'null'));
-    logln('[bookings] rows: ' + (data ? data.length : 0));
-    if (data && data.length) {
-      logln('[bookings] sample row: ' + JSON.stringify(data[0], null, 2));
-      renderTable(data);
-    } else {
-      logln('[bookings] пусто — либо нет записей, либо RLS блокирует SELECT (см. error).');
+// safe init: wait for session or redirect to login
+async function initAdmin(){
+  try {
+    // wait for authenticated user
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      // subscribe for auth changes for short time (helps immediate redirect after signIn)
+      await new Promise(resolve=>{
+        const sub = supabase.auth.onAuthStateChange((event, session) => {
+          if (session?.access_token) {
+            try{ sub.subscription.unsubscribe(); }catch(e){}
+            resolve();
+          }
+        });
+        setTimeout(()=>{ try{ sub.subscription.unsubscribe(); }catch(e){}; resolve(); }, 6000);
+      });
     }
-  } catch(e){ logln('[bookings] EXCEPTION: ' + e.message); }
 
-  // 4) try select profiles
-  try{
-    logln('[profiles] trying select * from public.profiles (limit 10)');
-    const { data, error } = await supabase.from('profiles').select('*').limit(10);
-    logln('[profiles] response error: ' + (error ? JSON.stringify(error) : 'null'));
-    logln('[profiles] rows: ' + (data ? data.length : 0));
-    if (data && data.length) logln('[profiles] sample: ' + JSON.stringify(data[0], null, 2));
-  } catch(e){ logln('[profiles] EXCEPTION: ' + e.message); }
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      alert('Вы не авторизованы. Войдите и откройте эту страницу снова.');
+      location.href = '/'; // or keep on page
+      return;
+    }
+    currentUser = user;
+    $('userBlock').textContent = `${user.email} · id: ${user.id}`;
 
-  // 5) check policies hint (best-effort)
-  logln('[hint] Если в error возвращается "permission_denied" или RLS — зайди в Supabase → SQL Editor и проверь политики для bookings/profiles (мы давали скрипт).');
-  logln('=== Diagnostics finished ===');
+    // check admin flag
+    try {
+      const { data: profile, error: pErr } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+      if (pErr) { appendLog('profile fetch error: ' + (pErr.message || JSON.stringify(pErr))); isAdmin = false; }
+      else isAdmin = profile?.is_admin === true;
+    } catch(e){ appendLog('profile fetch exception: '+e.message); isAdmin = false; }
+
+    // show admin buttons only if admin
+    if (isAdmin) {
+      $('deleteAllBtn').style.display = 'inline-block';
+      $('deleteSelectedBtn').style.display = 'inline-block';
+    }
+
+    // attach UI handlers
+    $('btnLogout').addEventListener('click', async ()=>{ await supabase.auth.signOut(); location.reload(); });
+    $('refreshBtn')?.addEventListener('click', loadAndRender); // optional if present
+    $('clearFilters').addEventListener('click', ()=>{ $('roomFilter').value=''; $('dateFilter').value=''; $('q').value=''; loadAndRender(); });
+    $('q').addEventListener('input', debounce(loadAndRender, 300));
+    $('roomFilter').addEventListener('change', loadAndRender);
+    $('dateFilter').addEventListener('change', loadAndRender);
+    $('exportCsv').addEventListener('click', exportCSV);
+    $('deleteAllBtn').addEventListener('click', deleteAllBookingsConfirm);
+    $('deleteSelectedBtn').addEventListener('click', deleteSelectedConfirm);
+    $('checkAll').addEventListener('change', onToggleAll);
+
+    // delegated click handler (reliable) for row delete buttons
+    document.body.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.classList.contains('row-delete')) {
+        const tr = btn.closest('tr');
+        if (!tr) return;
+        const id = tr.dataset.id;
+        if (!id) { toast('Не удалось определить id'); return; }
+        if (!confirm('Удалить бронь id=' + id + ' ? Это окончательно.')) return;
+        await deleteBooking(id);
+      }
+    });
+
+    // realtime subscription (refresh on changes)
+    supabase.channel('realtime-bookings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => loadAndRender())
+      .subscribe();
+
+    // initial load
+    await loadAndRender();
+    await loadProfiles();
+  } catch (err) {
+    console.error('initAdmin error', err);
+    appendLog('init error: ' + (err.message || JSON.stringify(err)));
+  }
 }
 
-function renderTable(rows){
-  const wrap = document.getElementById('tableWrap');
-  const table = document.createElement('table');
-  const head = '<tr><th>ID</th><th>user_email</th><th>user_id</th><th>room</th><th>start</th></tr>';
-  table.innerHTML = head;
-  rows.forEach(r=>{
+async function loadBookings(){
+  try {
+    const { data, error } = await supabase.from('bookings')
+      .select('id, room, start, end, user_email, user_id, created_at')
+      .order('start', { ascending: true });
+    if (error) {
+      appendLog('loadBookings error: ' + (error.message || JSON.stringify(error)));
+      bookingsCache = [];
+      return;
+    }
+    bookingsCache = (data || []).map(b => ({ ...b, start: new Date(b.start), end: new Date(b.end) }));
+  } catch(e) {
+    appendLog('loadBookings exception: ' + e.message);
+    bookingsCache = [];
+  }
+}
+
+async function loadAndRender(){
+  $('stats').textContent = 'Загрузка...';
+  await loadBookings();
+  populateRoomFilter();
+  renderBookings();
+  $('stats').textContent = `Всего броней: ${bookingsCache.length} · ${isAdmin ? 'Вы: админ' : 'Вы: пользователь'}`;
+}
+
+function populateRoomFilter(){
+  const rooms = Array.from(new Set(bookingsCache.map(b => b.room).filter(Boolean)));
+  const sel = $('roomFilter'); const cur = sel.value || '';
+  sel.innerHTML = '<option value="">Все комнаты</option>';
+  rooms.forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.textContent = r; if (r === cur) opt.selected = true; sel.appendChild(opt); });
+}
+
+function renderBookings(){
+  const tbody = document.querySelector('#bookingsTable tbody');
+  tbody.innerHTML = '';
+  const q = $('q').value.trim().toLowerCase();
+  const roomFilter = $('roomFilter').value;
+  const dateFilter = $('dateFilter').value;
+
+  let list = bookingsCache.slice();
+  if (roomFilter) list = list.filter(b => b.room === roomFilter);
+  if (dateFilter) list = list.filter(b => b.start.toISOString().slice(0,10) === dateFilter);
+  if (q) list = list.filter(b => ((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">Броней не найдено по фильтрам.</td></tr>`;
+    return;
+  }
+
+  list.forEach(b => {
+    const canDelete = currentUser && (String(currentUser.id) === String(b.user_id) || isAdmin);
+    const deleteBtn = canDelete ? `<button class="ghost row-delete">Удалить</button>` : '';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.id||''}</td><td>${r.user_email||''}</td><td>${r.user_id||''}</td><td>${r.room||''}</td><td>${r.start||''}</td>`;
-    table.appendChild(tr);
+    tr.dataset.id = b.id;
+    tr.innerHTML = `
+      <td><input type="checkbox" class="row-checkbox" data-id="${b.id}" /></td>
+      <td style="min-width:200px">${escapeHtml(b.id)}</td>
+      <td>${escapeHtml(b.room)}</td>
+      <td>${formatDate(b.start)}</td>
+      <td>${formatTimeRange(b.start,b.end)}</td>
+      <td>${escapeHtml(b.user_email || b.user_id || '—')}</td>
+      <td class="actions">${deleteBtn}</td>
+    `;
+    tbody.appendChild(tr);
   });
-  wrap.innerHTML = '';
-  wrap.appendChild(table);
+
+  // attach checkbox handlers (delegated)
+  document.querySelectorAll('.row-checkbox').forEach(cb => {
+    cb.onchange = (e) => {
+      const id = cb.dataset.id;
+      if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+      $('checkAll').checked = document.querySelectorAll('#bookingsTable tbody .row-checkbox').length === document.querySelectorAll('#bookingsTable tbody .row-checkbox:checked').length;
+    };
+  });
 }
 
-// explicit loaders
-document.getElementById('runDiag').addEventListener('click', runDiagnostics);
-document.getElementById('loadBookings').addEventListener('click', async ()=>{
-  clearOut(); logln('manual loadBookings...');
-  try{ const { data, error } = await supabase.from('bookings').select('*').order('created_at',{ascending:false}).limit(50); logln('error: '+JSON.stringify(error)); logln('rows: '+(data?data.length:0)); if(data) renderTable(data); }catch(e){ logln('EX: '+e.message); }
-});
-document.getElementById('loadProfiles').addEventListener('click', async ()=>{
-  clearOut(); logln('manual loadProfiles...');
-  try{ const { data, error } = await supabase.from('profiles').select('*').limit(50); logln('error: '+JSON.stringify(error)); logln('rows: '+(data?data.length:0)); if(data && data.length) logln('sample: '+JSON.stringify(data[0], null,2)); }catch(e){ logln('EX: '+e.message); }
-});
-document.getElementById('testDelete').addEventListener('click', async ()=>{
-  clearOut(); logln('test delete: will try to delete most recent booking (if any).');
-  try{
-    const { data: bookings } = await supabase.from('bookings').select('*').order('created_at',{ascending:false}).limit(1);
-    if(!bookings || !bookings.length){ logln('no bookings to test-delete'); return; }
-    const id = bookings[0].id;
-    logln('trying delete id=' + id);
-    const { data, error } = await supabase.from('bookings').delete().eq('id', id);
-    logln('delete error: ' + JSON.stringify(error));
-    logln('delete data: ' + JSON.stringify(data));
-  }catch(e){ logln('EX: '+e.message); }
-});
-document.getElementById('logout').addEventListener('click', async ()=>{
-  await supabase.auth.signOut();
-  alert('Signed out — refresh page and sign in again.');
-});
+function onToggleAll(){
+  const all = $('checkAll').checked;
+  document.querySelectorAll('#bookingsTable tbody .row-checkbox').forEach(cb=>{
+    cb.checked = all;
+    const id = cb.dataset.id;
+    if (all) selectedIds.add(id); else selectedIds.delete(id);
+  });
+}
 
-// auto-run diagnostics on load (optional)
-window.addEventListener('load', ()=>{ /* nothing auto */ });
+async function deleteBooking(id){
+  try{
+    const { error } = await supabase.from('bookings').delete().eq('id', id);
+    if (error) throw error;
+    toast('Бронь удалена');
+    selectedIds.delete(id);
+    await loadAndRender();
+  } catch(err) {
+    console.error('deleteBooking error', err);
+    alert('Ошибка удаления: ' + (err.message || JSON.stringify(err)));
+  }
+}
+
+function deleteSelectedConfirm(){
+  if (selectedIds.size === 0) { alert('Нет выбранных записей'); return; }
+  if (!confirm(`Удалить ${selectedIds.size} выбранных броней? Это необратимо.`)) return;
+  deleteSelected();
+}
+async function deleteSelected(){
+  const ids = Array.from(selectedIds);
+  try{
+    const { error } = await supabase.from('bookings').delete().in('id', ids);
+    if (error) throw error;
+    toast(`Удалено ${ids.length}`);
+    selectedIds.clear(); $('checkAll').checked = false;
+    await loadAndRender();
+  } catch(err) {
+    console.error('deleteSelected error', err);
+    alert('Ошибка при удалении: ' + (err.message || JSON.stringify(err)));
+  }
+}
+
+function deleteAllBookingsConfirm(){
+  if (!isAdmin) { alert('Только админ может удалять все брони.'); return; }
+  const a = prompt('Напишите CONFIRM чтобы удалить все брони окончательно:');
+  if (a !== 'CONFIRM') { alert('Отменено. Для удаления введите CONFIRM'); return; }
+  if (!confirm('Ещё раз: удалить ВСЕ брони окончательно?')) return;
+  deleteAllBookings();
+}
+async function deleteAllBookings(){
+  try{
+    const { error } = await supabase.from('bookings').delete().neq('id','');
+    if (error) throw error;
+    toast('Все брони удалены');
+    selectedIds.clear(); $('checkAll').checked = false;
+    await loadAndRender();
+  } catch(err) {
+    console.error('deleteAll error', err);
+    alert('Ошибка удаления всех броней: ' + (err.message || JSON.stringify(err)));
+  }
+}
+
+function exportCSV(){
+  let list = bookingsCache.slice();
+  const q = $('q').value.trim().toLowerCase();
+  const roomFilter = $('roomFilter').value;
+  const dateFilter = $('dateFilter').value;
+  if (roomFilter) list = list.filter(b => b.room === roomFilter);
+  if (dateFilter) list = list.filter(b => b.start.toISOString().slice(0,10) === dateFilter);
+  if (q) list = list.filter(b => ((b.user_email||'').toLowerCase().includes(q) || (b.user_id||'').toLowerCase().includes(q) || (b.room||'').toLowerCase().includes(q)));
+  if (!list.length) { alert('Нечего экспортировать'); return; }
+  const header=['id','room','date','start','end','user_email','user_id'];
+  const rows=[header.join(',')];
+  list.forEach(r => rows.push([r.id,r.room,r.start.toISOString().slice(0,10),r.start.toISOString(),r.end.toISOString(),r.user_email||'',r.user_id||''].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')));
+  const csv = rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'bookings_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// load profiles for display
+async function loadProfiles(){
+  try{
+    const { data, error } = await supabase.from('profiles').select('id, full_name, is_admin').order('created_at', { ascending: true });
+    if (error) { appendLog('profiles read error: ' + (error.message || JSON.stringify(error))); return; }
+    // small optional display below table
+    appendLog('profiles loaded: ' + data.length);
+  }catch(e){ appendLog('loadProfiles exception: ' + e.message); }
+}
+
+// util
+function escapeHtml(s){ if (s==null) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function formatDate(d){ return d.toLocaleDateString(); }
+function formatTimeRange(s,e){ return `${s.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} — ${e.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`; }
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+
+initAdmin();
 </script>
 </body>
 </html>
