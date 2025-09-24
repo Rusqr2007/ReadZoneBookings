@@ -296,7 +296,7 @@
 
     // --- BOOKINGS: create/read/delete ---
     async function createBooking(){ 
-        if(!currentUser){ showMessage('bookingMessage','Войдите в систему'); }
+        if(!currentUser){ showMessage('bookingMessage','Войдите в систему'); return; }
 
         const date = el('bookingDate').value; 
         const timeStart = el('time-start').value; 
