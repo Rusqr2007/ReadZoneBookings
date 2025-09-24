@@ -9,7 +9,7 @@ exports.handler = async function(event, context) {
   const q = event.queryStringParameters || {};
   const { room, user_id } = q;
 
-  // Простой запрос: получим либо все брони (если админ), либо по фильтрам
+  // Запрос теперь просто получает все данные из таблицы бронирований
   let url = `${SUPABASE_URL}/rest/v1/bookings?select=*`;
   if(room) url += `&room=eq.${encodeURIComponent(room)}`;
   if(user_id) url += `&user_id=eq.${encodeURIComponent(user_id)}`;
