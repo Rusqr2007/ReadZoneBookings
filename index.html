@@ -20,7 +20,7 @@
         <p class="subtitle">Бронирование читального зала</p>
 
         <div class="auth-card active" id="authCard">
-            <div class="form-group"><label for="name">Ваше имя</label><input type="text" id="name" placeholder="Бердалы Лейла"></div>
+            <div class="form-group"><label for="name">Ваше имя</label><input type="text" id="name" placeholder="Иван Иванов"></div>
             <div class="form-group"><label for="email">Email</label><input type="email" id="email" placeholder="you@example.com"></div>
             <div class="form-group"><label for="password">Пароль</label><input type="password" id="password" placeholder="Минимум 6 символов"></div>
             <button class="btn" id="btnSignIn">Войти</button>
@@ -263,9 +263,10 @@
     async function signOut(){ await supabase.auth.signOut(); currentUser = null; showAuth(); if(realtimeChannel){ supabase.removeChannel(realtimeChannel); realtimeChannel = null; } }
 
     // --- PROFILE / SETTINGS ---
-    async function loadUserSettings(){ 
+async function loadUserSettings(){ 
         if(!currentUser) return; 
         const { data: profile } = await supabase.from('profiles').select('user_name, display_type').eq('id', currentUser.id).maybeSingle(); 
+        
         el('settingsName').value = profile?.user_name || currentUser.user_metadata?.user_name || ''; 
         el('settingsEmail').value = currentUser.email || ''; 
         
@@ -284,7 +285,8 @@
         const newName = el('settingsName').value.trim(); 
         const newPassword = el('newPassword').value; 
         const confirmPassword = el('confirmPassword').value; 
-        const displayType = el('privacy-email').checked ? 'email' : 'name';
+        
+        const displayType = document.querySelector('input[name="privacy"]:checked').value;
         
         if(!newName){ showMessage('settingsMessage','Имя не может быть пустым'); return; } 
         if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } 
