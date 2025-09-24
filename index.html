@@ -128,9 +128,6 @@
         const params = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = params.get('access_token');
         if (accessToken) {
-            // Если в URL есть токен, значит это сброс пароля.
-            // Supabase автоматически обрабатывает его и входит в систему,
-            // но мы можем проверить, что пользователь авторизован, и показать форму смены пароля.
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 currentUser = user;
@@ -148,11 +145,9 @@
             }
         }
 
-        // подписка на изменения авторизации
         supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
                 currentUser = session.user;
-                // Проверяем, если это не сброс пароля
                 if (!window.location.hash.includes('access_token')) {
                     startAppForUser();
                 }
@@ -162,7 +157,6 @@
             }
         });
 
-        // кнопки
         el('btnSignUp').addEventListener('click', signUp);
         el('btnSignIn').addEventListener('click', signIn);
         el('btnResetShow').addEventListener('click', showPasswordReset);
@@ -179,7 +173,6 @@
 
     });
 
-    // запускаем логику для залогиненного пользователя
     async function startAppForUser(){
         if(!currentUser) return;
 
@@ -263,7 +256,7 @@
     async function signOut(){ await supabase.auth.signOut(); currentUser = null; showAuth(); if(realtimeChannel){ supabase.removeChannel(realtimeChannel); realtimeChannel = null; } }
 
     // --- PROFILE / SETTINGS ---
-async function loadUserSettings(){ 
+    async function loadUserSettings(){ 
         if(!currentUser) return; 
         const { data: profile } = await supabase.from('profiles').select('user_name, display_type').eq('id', currentUser.id).maybeSingle(); 
         
@@ -286,7 +279,7 @@ async function loadUserSettings(){
         const newPassword = el('newPassword').value; 
         const confirmPassword = el('confirmPassword').value; 
         
-        const displayType = document.querySelector('input[name="privacy"]:checked').value;
+        const displayType = document.querySelector('input[name="privacy"]:checked')?.value || 'name';
         
         if(!newName){ showMessage('settingsMessage','Имя не может быть пустым'); return; } 
         if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } 
@@ -303,7 +296,7 @@ async function loadUserSettings(){
 
     // --- BOOKINGS: create/read/delete ---
     async function createBooking(){ 
-        if(!currentUser){ showMessage('bookingMessage','Войдите в систему'); return; }
+        if(!currentUser){ showMessage('bookingMessage','Войдите в систему'); }
 
         const date = el('bookingDate').value; 
         const timeStart = el('time-start').value; 
