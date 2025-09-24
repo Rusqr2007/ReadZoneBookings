@@ -1,140 +1,330 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReadZone - Бронирование читального зала</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <style>
-    * {margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-    .container{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-radius:20px;padding:40px;box-shadow:0 20px 40px rgba(0,0,0,.1);width:100%;max-width:650px;text-align:center}
-    h1{color:#333;margin-bottom:10px;font-size:2rem;font-weight:600}
-    .subtitle{color:#666;margin-bottom:30px;font-size:.9rem}
-    .form-group{margin-bottom:20px;text-align:left}
-    label{display:block;margin-bottom:8px;color:#555;font-weight:500;font-size:.9rem}
-    input,select,textarea{width:100%;padding:12px;border:2px solid #e1e5e9;border-radius:12px;font-size:16px;background:white}
-    .date-time-group{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .btn{width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;margin-top:10px}
-    .btn-secondary{background:#6c757d}
-    .auth-card,.booking-card,.password-reset-card,.settings-card{display:none}
-    .auth-card.active,.booking-card.active,.password-reset-card.active,.settings-card.active{display:block}
-    .bookings-list{margin-top:20px;text-align:left}
-    .booking-item{background:#f8f9fa;padding:12px;border-radius:10px;margin-bottom:10px;border-left:4px solid #667eea;cursor:pointer}
-    .booking-time{font-weight:600;color:#333}
-    .booking-duration{color:#666;font-size:.9rem}
-    .booking-comment{font-size:.9rem;color:#444;margin-top:5px;font-style:italic;white-space:pre-wrap}
-    .error{color:#dc3545;font-size:.9rem;margin-top:5px}
-    .success{color:#28a745;font-size:.9rem;margin-top:5px}
-    .room-info{background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:16px;border-radius:12px;margin-bottom:20px;text-align:left}
-    .room-title{font-size:1.1rem;font-weight:600;color:#333;margin-bottom:4px}
-    .info-text{color:#555;font-size:.9rem;margin-top:-8px;margin-bottom:16px;text-align:left}
-    .modal{display:none;position:fixed;z-index:1;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);justify-content:center;align-items:center}
-    .modal-content{background:#fff;padding:16px;border-radius:10px;width:90%;max-width:420px;position:relative}
-    .close-btn{position:absolute;right:12px;top:6px;font-size:22px;cursor:pointer}
-    .checkbox-container{display:block;position:relative;padding-left:35px;margin-bottom:10px;cursor:pointer;font-size:.9rem;color:#555;text-align:left}
-    .checkbox-container input{position:absolute;opacity:0;cursor:pointer;height:0;width:0}
-    .checkmark{position:absolute;left:0;top:0;height:22px;width:22px;background:#eee;border-radius:6px}
-    .checkbox-container input:checked ~ .checkmark{background:#667eea}
-    .checkmark:after{content:"";position:absolute;display:none}
-    .checkbox-container input:checked ~ .checkmark:after{display:block}
-    .checkbox-container .checkmark:after{left:8px;top:4px;width:6px;height:12px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}
-    .privacy-options {display:flex;gap:15px;margin:10px 0}
-    .privacy-option label{display:flex;align-items:center;gap:5px;cursor:pointer}
-    .privacy-option input[type="radio"]{width:auto}
-    .modal-delete-btn{background:#dc3545;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:10px}
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReadZone - Бронирование читального зала</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    * {margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .container{background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-radius:20px;padding:40px;box-shadow:0 20px 40px rgba(0,0,0,.1);width:100%;max-width:650px;text-align:center}
+    h1{color:#333;margin-bottom:10px;font-size:2rem;font-weight:600}
+    .subtitle{color:#666;margin-bottom:30px;font-size:.9rem}
+    .form-group{margin-bottom:20px;text-align:left}
+    label{display:block;margin-bottom:8px;color:#555;font-weight:500;font-size:.9rem}
+    input,select,textarea{width:100%;padding:12px;border:2px solid #e1e5e9;border-radius:12px;font-size:16px;background:white}
+    .date-time-group{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn{width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;margin-top:10px}
+    .btn-secondary{background:#6c757d}
+    .auth-card,.booking-card,.password-reset-card,.settings-card, .password-reset-confirm-card{display:none}
+    .auth-card.active,.booking-card.active,.password-reset-card.active,.settings-card.active, .password-reset-confirm-card.active{display:block}
+    .bookings-list{margin-top:20px;text-align:left}
+    .booking-item{background:#f8f9fa;padding:12px;border-radius:10px;margin-bottom:10px;border-left:4px solid #667eea;cursor:pointer}
+    .booking-time{font-weight:600;color:#333}
+    .booking-duration{color:#666;font-size:.9rem}
+    .booking-comment{font-size:.9rem;color:#444;margin-top:5px;font-style:italic;white-space:pre-wrap}
+    .error{color:#dc3545;font-size:.9rem;margin-top:5px}
+    .success{color:#28a745;font-size:.9rem;margin-top:5px}
+    .room-info{background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);padding:16px;border-radius:12px;margin-bottom:20px;text-align:left}
+    .room-title{font-size:1.1rem;font-weight:600;color:#333;margin-bottom:4px}
+    .info-text{color:#555;font-size:.9rem;margin-top:-8px;margin-bottom:16px;text-align:left}
+    .modal{display:none;position:fixed;z-index:1;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);justify-content:center;align-items:center}
+    .modal-content{background:#fff;padding:16px;border-radius:10px;width:90%;max-width:420px;position:relative}
+    .close-btn{position:absolute;right:12px;top:6px;font-size:22px;cursor:pointer}
+    .checkbox-container{display:block;position:relative;padding-left:35px;margin-bottom:10px;cursor:pointer;font-size:.9rem;color:#555;text-align:left}
+    .checkbox-container input{position:absolute;opacity:0;cursor:pointer;height:0;width:0}
+    .checkmark{position:absolute;left:0;top:0;height:22px;width:22px;background:#eee;border-radius:6px}
+    .checkbox-container input:checked ~ .checkmark{background:#667eea}
+    .checkmark:after{content:"";position:absolute;display:none}
+    .checkbox-container input:checked ~ .checkmark:after{display:block}
+    .checkbox-container .checkmark:after{left:8px;top:4px;width:6px;height:12px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg)}
+    .privacy-options {display:flex;gap:15px;margin:10px 0}
+    .privacy-option label{display:flex;align-items:center;gap:5px;cursor:pointer}
+    .privacy-option input[type="radio"]{width:auto}
+    .modal-delete-btn{background:#dc3545;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:10px}
+  </style>
 </head>
 <body>
-  <div class="container">
-    <h1>ReadZoneBookings</h1>
-    <p class="subtitle">Бронирование читального зала</p>
+  <div class="container">
+    <h1>ReadZoneBookings</h1>
+    <p class="subtitle">Бронирование читального зала</p>
 
-    <!-- === AUTH === -->
-    <div class="auth-card active" id="authCard">
-      <div class="form-group"><label for="name">Ваше имя</label><input type="text" id="name" placeholder="Бердалы Лейла"></div>
-      <div class="form-group"><label for="email">Email</label><input type="email" id="email" placeholder="you@example.com"></div>
-      <div class="form-group"><label for="password">Пароль</label><input type="password" id="password" placeholder="Минимум 6 символов"></div>
-      <button class="btn" id="btnSignIn">Войти</button>
-      <button class="btn btn-secondary" id="btnSignUp">Зарегистрироваться</button>
-      <button class="btn btn-secondary" id="btnResetShow">Сброс пароля</button>
-      <div id="authMessage"></div>
+        <div class="auth-card" id="authCard">
+      <div class="form-group"><label for="name">Ваше имя</label><input type="text" id="name" placeholder="Бердалы Лейла"></div>
+      <div class="form-group"><label for="email">Email</label><input type="email" id="email" placeholder="you@example.com"></div>
+      <div class="form-group"><label for="password">Пароль</label><input type="password" id="password" placeholder="Минимум 6 символов"></div>
+      <button class="btn" id="btnSignIn">Войти</button>
+      <button class="btn btn-secondary" id="btnSignUp">Зарегистрироваться</button>
+      <button class="btn btn-secondary" id="btnResetShow">Сброс пароля</button>
+      <div id="authMessage"></div>
+    </div>
+
+        <div class="password-reset-card" id="passwordResetCard">
+      <h2>Сброс пароля</h2>
+      <div class="form-group"><label for="resetEmail">Email</label><input type="email" id="resetEmail" placeholder="you@example.com"></div>
+      <button class="btn" id="btnReset">Отправить письмо</button>
+      <button class="btn btn-secondary" id="btnBackToAuth">Вернуться ко входу</button>
+      <div id="resetMessage"></div>
+    </div>
+
+    <div class="password-reset-confirm-card" id="passwordResetConfirmCard">
+        <h2>Новый пароль</h2>
+        <div class="form-group"><label for="newPasswordReset">Новый пароль</label><input type="password" id="newPasswordReset" placeholder="Минимум 6 символов"></div>
+        <div class="form-group"><label for="confirmNewPasswordReset">Подтвердите пароль</label><input type="password" id="confirmNewPasswordReset" placeholder="Повторите пароль"></div>
+        <button class="btn" id="btnConfirmPasswordReset">Сохранить новый пароль</button>
+        <div id="passwordResetConfirmMessage"></div>
     </div>
 
-    <!-- === RESET === -->
-    <div class="password-reset-card" id="passwordResetCard">
-      <h2>Сброс пароля</h2>
-      <div class="form-group"><label for="resetEmail">Email</label><input type="email" id="resetEmail" placeholder="you@example.com"></div>
-      <button class="btn" id="btnReset">Отправить письмо</button>
-      <button class="btn btn-secondary" id="btnBackToAuth">Вернуться ко входу</button>
-      <div id="resetMessage"></div>
-    </div>
+        <div class="settings-card" id="settingsCard">
+      <h2>Настройки аккаунта</h2>
+      <div class="form-group"><label for="settingsName">Имя</label><input type="text" id="settingsName" placeholder="Ваше имя"></div>
+      <div class="form-group"><label for="settingsEmail">Email</label><input type="email" id="settingsEmail" disabled><small>Email нельзя изменить</small></div>
+      <div class="form-group"><label for="newPassword">Новый пароль</label><input type="password" id="newPassword"></div>
+      <div class="form-group"><label for="confirmPassword">Подтвердите пароль</label><input type="password" id="confirmPassword"></div>
+      <div class="form-group">
+        <label>Что показывать другим в бронях:</label>
+        <div class="privacy-options">
+          <div class="privacy-option"><input type="radio" id="privacy-name" name="privacy" value="name"><label for="privacy-name">Показывать имя</label></div>
+          <div class="privacy-option"><input type="radio" id="privacy-email" name="privacy" value="email"><label for="privacy-email">Показывать email</label></div>
+        </div>
+      </div>
+      <button class="btn" id="btnSaveSettings">Сохранить</button>
+      <button class="btn btn-secondary" id="btnBackToBooking">Назад</button>
+      <div id="settingsMessage"></div>
+    </div>
 
-    <!-- === SETTINGS === -->
-    <div class="settings-card" id="settingsCard">
-      <h2>Настройки аккаунта</h2>
-      <div class="form-group"><label for="settingsName">Имя</label><input type="text" id="settingsName" placeholder="Ваше имя"></div>
-      <div class="form-group"><label for="settingsEmail">Email</label><input type="email" id="settingsEmail" disabled><small>Email нельзя изменить</small></div>
-      <div class="form-group"><label for="newPassword">Новый пароль</label><input type="password" id="newPassword"></div>
-      <div class="form-group"><label for="confirmPassword">Подтвердите пароль</label><input type="password" id="confirmPassword"></div>
-      <div class="form-group">
-        <label>Что показывать другим в бронях:</label>
-        <div class="privacy-options">
-          <div class="privacy-option"><input type="radio" id="privacy-name" name="privacy" value="name"><label for="privacy-name">Показывать имя</label></div>
-          <div class="privacy-option"><input type="radio" id="privacy-email" name="privacy" value="email"><label for="privacy-email">Показывать email</label></div>
-        </div>
-      </div>
-      <button class="btn" id="btnSaveSettings">Сохранить</button>
-      <button class="btn btn-secondary" id="btnBackToBooking">Назад</button>
-      <div id="settingsMessage"></div>
-    </div>
+        <div class="booking-card" id="bookingCard">
+      <div class="room-info"><div class="room-title">Читальный зал</div><div class="room-desc">Место для учебы и работы</div></div>
+      <div class="form-group"><label for="bookingDate">Дата</label><input type="date" id="bookingDate"></div>
+      <div class="form-group date-time-group">
+        <div><label for="time-start">Начало</label><input type="time" id="time-start"></div>
+        <div><label for="time-end">Конец</label><input type="time" id="time-end"></div>
+      </div>
+      <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
+      <div class="form-group"><label for="bookingComment">Комментарий</label><textarea id="bookingComment" rows="3" placeholder="Цель бронирования"></textarea></div>
+      <button class="btn" id="btnCreateBooking">Забронировать</button>
+      <button class="btn btn-secondary" id="btnSignOut">Выйти</button>
+      <button class="btn btn-secondary" id="btnSettings">Настройки</button>
+      <div id="bookingMessage"></div>
+      <div class="bookings-list"><h3>Мои брони</h3><div id="bookingsList"></div></div>
+      <div class="bookings-list" style="margin-top:20px;"><h3>Все брони</h3><div id="allBookingsList"></div></div>
+    </div>
+  </div>
 
-    <!-- === BOOKING === -->
-    <div class="booking-card" id="bookingCard">
-      <div class="room-info"><div class="room-title">Читальный зал</div><div class="room-desc">Место для учебы и работы</div></div>
-      <div class="form-group"><label for="bookingDate">Дата</label><input type="date" id="bookingDate"></div>
-      <div class="form-group date-time-group">
-        <div><label for="time-start">Начало</label><input type="time" id="time-start"></div>
-        <div><label for="time-end">Конец</label><input type="time" id="time-end"></div>
-      </div>
-      <p class="info-text">(Максимальная длительность брони: 4 часа)</p>
-      <div class="form-group"><label for="bookingComment">Комментарий</label><textarea id="bookingComment" rows="3" placeholder="Цель бронирования"></textarea></div>
-      <button class="btn" id="btnCreateBooking">Забронировать</button>
-      <button class="btn btn-secondary" id="btnSignOut">Выйти</button>
-      <button class="btn btn-secondary" id="btnSettings">Настройки</button>
-      <div id="bookingMessage"></div>
-      <div class="bookings-list"><h3>Мои брони</h3><div id="bookingsList"></div></div>
-      <div class="bookings-list" style="margin-top:20px;"><h3>Все брони</h3><div id="allBookingsList"></div></div>
-    </div>
-  </div>
-
-  <div id="bookingModal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><div id="modalInfo"></div></div></div>
+  <div id="bookingModal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><div id="modalInfo"></div></div></div>
 
 <script>
-  // Настройка Supabase
-  const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR...'; // твой ключ
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Настройка Supabase
+  const SUPABASE_URL = 'https://ufdpcktbgazzrqzqxxhf.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZHBja3RiZ2F6enJxenF4eGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDQwNjA4NDUsImV4cCI6MjAyOTYzNjg0NX0.V5H2o2i6_zD1G_8f3-Q8-hV7-s4O5-p_K5e-z_b4H_0'; // твой ключ
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // элементы
-  const authCard = el('authCard'), bookingCard = el('bookingCard'), passwordResetCard = el('passwordResetCard'), settingsCard = el('settingsCard');
-  let currentUser = null;
+  // Элементы
+  const authCard = el('authCard'),
+      bookingCard = el('bookingCard'),
+      passwordResetCard = el('passwordResetCard'),
+      settingsCard = el('settingsCard'),
+      passwordResetConfirmCard = el('passwordResetConfirmCard');
 
-  function el(id){ return document.getElementById(id); }
-  function showMessage(id, text, type='error'){ el(id).innerHTML = `<div class="${type}">${text}</div>`; setTimeout(()=>el(id).innerHTML='',5000); }
+  let currentUser = null;
 
-  // --- AUTH, SETTINGS, BOOKINGS функции такие же как у тебя ---
-  // ...
-  // --- DELETE FIX ---
-  async function deleteBooking(id){ 
-    if(!currentUser){ alert('Нужен вход'); return; } 
-    const { error } = await supabase.from('bookings').delete().eq('id', id).eq('user_id', currentUser.id); 
-    if(error){ alert('Ошибка удаления: '+error.message); return; } 
-    alert('Бронь удалена'); 
-    el('bookingModal').style.display='none'; 
-    await loadUserBookings(); 
-    await loadAllBookings(); 
-  }
+  function el(id){ return document.getElementById(id); }
+  function showMessage(id, text, type='error'){ el(id).innerHTML = `<div class="${type}">${text}</div>`; setTimeout(()=>el(id).innerHTML='',5000); }
+
+  async function onAuthChange(session) {
+    if (session) {
+      currentUser = session.user;
+      await loadUserProfile();
+      showCard('bookingCard');
+      loadUserBookings();
+      loadAllBookings();
+    } else {
+      currentUser = null;
+      showCard('authCard');
+      el('bookingsList').innerHTML = '';
+      el('allBookingsList').innerHTML = '';
+    }
+  }
+
+  function showCard(cardId) {
+    const cards = [authCard, bookingCard, passwordResetCard, settingsCard, passwordResetConfirmCard];
+    cards.forEach(card => card.classList.remove('active'));
+    el(cardId).classList.add('active');
+  }
+
+  // Auth logic
+  el('btnSignUp').addEventListener('click', async () => {
+    const name = el('name').value, email = el('email').value, password = el('password').value;
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    if (error) { showMessage('authMessage', error.message); return; }
+    if (data.user) {
+      showMessage('authMessage', 'Регистрация успешна! Пожалуйста, подтвердите email по ссылке в письме.', 'success');
+    }
+  });
+
+  el('btnSignIn').addEventListener('click', async () => {
+    const email = el('email').value, password = el('password').value;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { showMessage('authMessage', error.message); return; }
+    showMessage('authMessage', 'Вход успешен!', 'success');
+    onAuthChange(data.session);
+  });
+
+  el('btnSignOut').addEventListener('click', async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) { showMessage('bookingMessage', error.message); return; }
+    showMessage('bookingMessage', 'Вы вышли из системы.', 'success');
+    onAuthChange(null);
+  });
+
+  // Password Reset
+  el('btnResetShow').addEventListener('click', () => showCard('passwordResetCard'));
+  el('btnBackToAuth').addEventListener('click', () => showCard('authCard'));
+
+  el('btnReset').addEventListener('click', async () => {
+    const email = el('resetEmail').value;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) { showMessage('resetMessage', error.message); return; }
+    showMessage('resetMessage', 'Письмо для сброса пароля отправлено на ваш email. Проверьте папку "Спам".', 'success');
+  });
+
+  el('btnConfirmPasswordReset').addEventListener('click', async () => {
+    const newPassword = el('newPasswordReset').value;
+    const confirmPassword = el('confirmNewPasswordReset').value;
+    if (newPassword !== confirmPassword) {
+      showMessage('passwordResetConfirmMessage', 'Пароли не совпадают!');
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) { showMessage('passwordResetConfirmMessage', error.message); return; }
+    showMessage('passwordResetConfirmMessage', 'Пароль успешно обновлен! Можете войти с новым паролем.', 'success');
+    showCard('authCard');
+  });
+
+  // Settings
+  el('btnSettings').addEventListener('click', () => {
+    showCard('settingsCard');
+    el('settingsEmail').value = currentUser.email;
+    el('settingsName').value = currentUser.user_metadata.name || '';
+    const privacyOption = currentUser.user_metadata.privacy_option || 'name';
+    el('privacy-' + privacyOption).checked = true;
+  });
+  el('btnBackToBooking').addEventListener('click', () => showCard('bookingCard'));
+  el('btnSaveSettings').addEventListener('click', async () => {
+    const name = el('settingsName').value;
+    const newPassword = el('newPassword').value;
+    const confirmPassword = el('confirmPassword').value;
+    const privacyOption = document.querySelector('input[name="privacy"]:checked').value;
+    if (newPassword && newPassword !== confirmPassword) {
+      showMessage('settingsMessage', 'Новые пароли не совпадают!');
+      return;
+    }
+
+    const updateData = { data: { name: name, privacy_option: privacyOption } };
+    if (newPassword) {
+      updateData.password = newPassword;
+    }
+
+    const { data, error } = await supabase.auth.updateUser(updateData);
+    if (error) { showMessage('settingsMessage', error.message); return; }
+    
+    currentUser.user_metadata = data.user.user_metadata;
+    
+    showMessage('settingsMessage', 'Настройки сохранены!', 'success');
+  });
+
+  // Booking logic
+  el('btnCreateBooking').addEventListener('click', async () => {
+    if (!currentUser) { showMessage('bookingMessage', 'Пожалуйста, войдите в систему.'); return; }
+    const date = el('bookingDate').value;
+    const timeStart = el('time-start').value;
+    const timeEnd = el('time-end').value;
+    const comment = el('bookingComment').value;
+    if (!date || !timeStart || !timeEnd) {
+      showMessage('bookingMessage', 'Пожалуйста, заполните все поля.');
+      return;
+    }
+    const bookingStart = new Date(`${date}T${timeStart}:00`);
+    const bookingEnd = new Date(`${date}T${timeEnd}:00`);
+    if (bookingEnd <= bookingStart) { showMessage('bookingMessage', 'Время окончания должно быть позже времени начала.'); return; }
+    const durationHours = (bookingEnd - bookingStart) / (1000 * 60 * 60);
+    if (durationHours > 4) { showMessage('bookingMessage', 'Максимальная длительность брони: 4 часа.'); return; }
+    const { data, error } = await supabase.from('bookings').insert([{ user_id: currentUser.id, start_time: bookingStart.toISOString(), end_time: bookingEnd.toISOString(), comment }]);
+    if (error) { showMessage('bookingMessage', 'Ошибка бронирования: ' + error.message); return; }
+    showMessage('bookingMessage', 'Бронь успешно создана!', 'success');
+    el('bookingComment').value = '';
+    loadUserBookings();
+    loadAllBookings();
+  });
+
+  async function loadUserProfile() {
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (error) { console.error('Error fetching profile:', error.message); return; }
+    currentUser.user_metadata = { name: data.name, privacy_option: data.privacy_option };
+  }
+
+  async function loadUserBookings(){
+    if (!currentUser) { el('bookingsList').innerHTML = ''; return; }
+    const { data: bookings, error } = await supabase.from('bookings').select('*').eq('user_id', currentUser.id).order('start_time', { ascending: false });
+    if (error) { console.error('Ошибка загрузки брони: ' + error.message); return; }
+    el('bookingsList').innerHTML = bookings.map(b => `
+      <div class="booking-item" onclick="showBookingDetails(${b.id})">
+        <div class="booking-time">${new Date(b.start_time).toLocaleString('ru-RU')} - ${new Date(b.end_time).toLocaleString('ru-RU', {hour: '2-digit', minute:'2-digit'})}</div>
+        <div class="booking-comment">${b.comment || 'Нет комментария'}</div>
+      </div>
+    `).join('');
+  }
+
+  async function loadAllBookings(){
+    const { data: bookings, error } = await supabase.from('bookings').select('*, profiles(name, privacy_option)').order('start_time', { ascending: false });
+    if (error) { console.error('Ошибка загрузки всех брони: ' + error.message); return; }
+    el('allBookingsList').innerHTML = bookings.map(b => {
+      const startTime = new Date(b.start_time).toLocaleString('ru-RU');
+      const endTime = new Date(b.end_time).toLocaleString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+      const privacy = b.profiles ? b.profiles.privacy_option : 'name';
+      let userDisplay = 'Аноним';
+      if (b.profiles) {
+        if (privacy === 'name') {
+          userDisplay = b.profiles.name || 'Имя не указано';
+        } else if (privacy === 'email') {
+          userDisplay = b.user_id; // display user id
+        }
+      }
+      return `
+        <div class="booking-item">
+          <div class="booking-time">${startTime} - ${endTime}</div>
+          <div class="booking-duration">Забронировано: ${userDisplay}</div>
+        </div>
+      `;
+    }).join('');
+  }
+  
+  function showBookingDetails(id) {
+    el('modalInfo').innerHTML = `
+      <h4>Подробности брони</h4>
+      <p>Вы уверены, что хотите удалить эту бронь?</p>
+      <button class="modal-delete-btn" onclick="deleteBooking(${id})">Удалить</button>
+    `;
+    el('bookingModal').style.display = 'flex';
+  }
+  el('bookingModal').querySelector('.close-btn').addEventListener('click', () => el('bookingModal').style.display = 'none');
+
+  async function deleteBooking(id){ 
+    if(!currentUser){ alert('Нужен вход'); return; } 
+    const { error } = await supabase.from('bookings').delete().eq('id', id).eq('user_id', currentUser.id); 
+    if(error){ alert('Ошибка удаления: '+error.message); return; } 
+    alert('Бронь удалена'); 
+    el('bookingModal').style.display='none'; 
+    await loadUserBookings(); 
+    await loadAllBookings(); 
+  }
+
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    onAuthChange(session);
+  });
 </script>
 </body>
 </html>
