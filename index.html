@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>ReadZone - Бронирование читального зала</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
@@ -121,42 +121,70 @@
 
     // инициализация
     document.addEventListener('DOMContentLoaded', async ()=> {
+        // date default
         const today = new Date().toISOString().split('T')[0];
         el('bookingDate').value = today;
         el('bookingDate').min = today;
-        
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        if (accessToken) {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                currentUser = user;
-                showPasswordChange();
+
+        // Попытка восстановить сессию из URL (magic link / reset password)
+        try {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const searchParams = new URLSearchParams(window.location.search);
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+            const errorDescription = hashParams.get('error_description');
+            const code = searchParams.get('code');
+
+            if (accessToken || code) {
+                // supabase v2 имеет getSessionFromUrl
+                if (typeof supabase.auth.getSessionFromUrl === 'function') {
+                    const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+                    if (!error && data?.session) {
+                        currentUser = data.session.user;
+                        // если пришёл по ссылке восстановления пароля, показать форму смены
+                        showPasswordChange();
+                    } else {
+                        // fallback: попробуем обычную сессию
+                        const { data: s } = await supabase.auth.getSession();
+                        if (s?.session) { currentUser = s.session.user; startAppForUser(); } else showAuth();
+                    }
+                } else {
+                    const { data } = await supabase.auth.getSession();
+                    if (data?.session) { currentUser = data.session.user; startAppForUser(); } else showAuth();
+                }
             } else {
-                showAuth();
+                const { data } = await supabase.auth.getSession();
+                if(data?.session) { 
+                    currentUser = data.session.user; 
+                    startAppForUser(); 
+                } else {
+                    showAuth();
+                }
             }
-        } else {
+        } catch(e){
+            console.error('session from url error', e);
             const { data } = await supabase.auth.getSession();
-            if(data?.session) { 
-                currentUser = data.session.user; 
-                startAppForUser(); 
-            } else {
-                showAuth();
-            }
+            if(data?.session) { currentUser = data.session.user; startAppForUser(); } else showAuth();
         }
 
+        // слушаем изменение авторизации
         supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
                 currentUser = session.user;
                 if (!window.location.hash.includes('access_token')) {
                     startAppForUser();
                 }
+            } else if (event === 'PASSWORD_RECOVERY') {
+                // Пользователь открыл ссылку восстановления — показываем форму смены пароля
+                currentUser = session?.user || null;
+                showPasswordChange();
             } else if (event === 'SIGNED_OUT') {
                 currentUser = null;
                 showAuth();
             }
         });
 
+        // кнопки
         el('btnSignUp').addEventListener('click', signUp);
         el('btnSignIn').addEventListener('click', signIn);
         el('btnResetShow').addEventListener('click', showPasswordReset);
@@ -171,16 +199,43 @@
         document.querySelector('.close-btn').addEventListener('click', ()=>el('bookingModal').style.display='none');
         window.addEventListener('click', (ev)=>{ if(ev.target === el('bookingModal')) el('bookingModal').style.display='none'; });
 
+        // cleanup old bookings on load (optional)
+        await cleanupOldBookings();
     });
 
+    // НЕЛЬЗЯ автоматически перезаписывать display_type при старте
     async function startAppForUser(){
         if(!currentUser) return;
 
         const safeName = currentUser.user_metadata?.user_name || null;
         const safeEmail = currentUser.email || null;
-        const { error: upsertErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: safeName, email: safeEmail, display_type: 'name' }], { onConflict: 'id' });
-        if(upsertErr) console.error('profile ensure error', upsertErr);
 
+        // Проверяем наличие профиля, если нет — создаём с display_type = 'name'
+        try {
+            const { data: existing, error: selErr } = await supabase.from('profiles').select('id,display_type').eq('id', currentUser.id).maybeSingle();
+            if (selErr) console.error('profile select error', selErr);
+
+            if (!existing) {
+                const { error: insertErr } = await supabase.from('profiles').insert([{
+                    id: currentUser.id,
+                    user_name: safeName,
+                    email: safeEmail,
+                    display_type: 'name'
+                }]);
+                if (insertErr) console.error('profile insert error', insertErr);
+            } else {
+                // Обновляем только имя/email, не трогаем display_type
+                const { error: updErr } = await supabase.from('profiles').update({
+                    user_name: safeName,
+                    email: safeEmail
+                }).eq('id', currentUser.id);
+                if (updErr) console.error('profile update error', updErr);
+            }
+        } catch(e){
+            console.error('ensure profile error', e);
+        }
+
+        // проверим, не админ ли
         const { data: profile, error } = await supabase.from('profiles').select('user_name, display_type, is_admin').eq('id', currentUser.id).maybeSingle();
         if(error) console.error('Не удалось загрузить профиль', error);
         else if(profile?.is_admin){ window.location.href = '/admin.html'; return; }
@@ -200,11 +255,15 @@
         if(!name || !email || !password){ showMessage('authMessage','Заполните все поля'); return; }
         if(password.length < 6){ showMessage('authMessage','Пароль должен быть минимум 6 символов'); return; }
 
+        // signUp: указываем user_metadata через options.data
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { user_name: name } } });
         if(error){ showMessage('authMessage', error.message); return; }
 
         const userId = data?.user?.id;
-        if(userId){ const { error: pe } = await supabase.from('profiles').upsert([{ id: userId, user_name: name, display_type: 'name', email }], { onConflict: 'id' }); if(pe) console.error('profile upsert error', pe); }
+        if(userId){
+            const { error: pe } = await supabase.from('profiles').upsert([{ id: userId, user_name: name, display_type: 'name', email }], { onConflict: 'id' });
+            if(pe) console.error('profile upsert error', pe);
+        }
         showMessage('authMessage','Регистрация инициирована. Проверьте почту для подтверждения.', 'success');
     }
 
@@ -249,11 +308,16 @@
             showMessage('passwordChangeMessage', 'Пароль успешно обновлён. Выполните вход с новым паролем.', 'success');
             setTimeout(() => {
                 showAuth();
-            }, 3000);
+            }, 2000);
         }
     }
 
-    async function signOut(){ await supabase.auth.signOut(); currentUser = null; showAuth(); if(realtimeChannel){ supabase.removeChannel(realtimeChannel); realtimeChannel = null; } }
+    async function signOut(){
+        await supabase.auth.signOut();
+        currentUser = null;
+        showAuth();
+        if(realtimeChannel){ supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
+    }
 
     // --- PROFILE / SETTINGS ---
     async function loadUserSettings(){ 
@@ -285,13 +349,15 @@
         if(newPassword && newPassword !== confirmPassword){ showMessage('settingsMessage','Пароли не совпадают'); return; } 
         if(newPassword && newPassword.length < 6){ showMessage('settingsMessage','Пароль должен быть минимум 6 символов'); return; }
 
+        // Сохраняем профиль (не затираем лишнего)
         const { error: pErr } = await supabase.from('profiles').upsert([{ id: currentUser.id, user_name: newName, display_type: displayType }], { onConflict: 'id' });
         if(pErr){ showMessage('settingsMessage','Ошибка обновления профиля: ' + pErr.message); return; }
 
+        // Обновляем метаданные пользователя (auth)
         let authErr = null;
         const { error: authUpdateErr } = await supabase.auth.updateUser({ data: { user_name: newName } }); authErr = authErr || authUpdateErr;
         if(newPassword){ const { error: passErr } = await supabase.auth.updateUser({ password: newPassword }); authErr = authErr || passErr; }
-        if(authErr) showMessage('settingsMessage','Ошибка обновления: ' + authErr.message); else { showMessage('settingsMessage','Настройки сохранены','success'); loadUserBookings(); loadAllBookings(); showBooking(); }
+        if(authErr) showMessage('settingsMessage','Ошибка обновления: ' + authErr.message); else { showMessage('settingsMessage','Настройки сохранены','success'); await loadUserBookings(); await loadAllBookings(); showBooking(); }
     }
 
     // --- BOOKINGS: create/read/delete ---
@@ -332,10 +398,18 @@
         await loadAllBookings(); 
     }
 
+    // Проверка пересечения интервалов (возвращает true если свободно)
     async function checkTimeAvailability(startIso, endIso){ 
-        const { data, error } = await supabase.from('bookings').select('id,start,end').or(`and(start.lt.${endIso},end.gt.${startIso})`); 
-        if(error){ console.error('check availability error', error); return false; } 
-        return !data || data.length === 0; 
+        // ищем записи, у которых start < endIso AND end > startIso => пересечение
+        try {
+            const filter = `and(start.lt.${endIso},end.gt.${startIso})`;
+            const { data, error } = await supabase.from('bookings').select('id,start,end').or(filter);
+            if(error){ console.error('check availability error', error); return false; } 
+            return !data || data.length === 0;
+        } catch(e){
+            console.error('check availability exception', e);
+            return false;
+        }
     }
 
     async function loadUserBookings(){ 
@@ -407,11 +481,12 @@
         return ''; 
     }
 
+    // Исправлено сравнение id — приводим к строкам
     function attachClickListeners(bookings){ 
         document.querySelectorAll('.booking-item').forEach(item => { 
             item.onclick = () => { 
                 const id = item.getAttribute('data-id'); 
-                const b = bookings.find(x => x.id === id); 
+                const b = bookings.find(x => String(x.id) === String(id)); 
                 if(b) showBookingDetails(b); 
             }; 
         }); 
@@ -423,7 +498,7 @@
         const modal = el('bookingModal'), info = el('modalInfo'); 
         const start = new Date(b.start), end = new Date(b.end); 
         
-        const isOwnBooking = currentUser && b.user_id === currentUser.id;
+        const isOwnBooking = currentUser && String(b.user_id) === String(currentUser.id);
         
         let displayName = 'Аноним';
         if (isOwnBooking) {
@@ -495,7 +570,7 @@
         } catch(e){ console.error(e); } 
     }
 
-    (async ()=>{ await cleanupOldBookings(); })();
+    (async ()=>{ /* already called on DOMContentLoaded */ })();
 
 </script>
 </body>
